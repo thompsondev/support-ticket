@@ -1273,6 +1273,7 @@ async function discover() {
 
   const pct = (v) =>
     v == null ? '—' : `<span style="color:${v >= 0 ? 'var(--green, #3ba55d)' : '#ed4245'}">${v >= 0 ? '+' : ''}${Number(v).toFixed(1)}%</span>`;
+  const watchedIds = new Set((d.watchlist ?? []).map((w) => w.coin_id));
   const coinRow = (c) => `<tr data-coin="${c.id}" data-name="${esc(c.name)}" data-sym="${esc(c.symbol)}">
     <td style="white-space:nowrap">${c.thumb ? `<img src="${c.thumb}" style="width:20px;height:20px;border-radius:50%;vertical-align:middle;margin-right:6px">` : ''}<b>${esc(c.name)}</b> <span class="muted">${esc((c.symbol ?? '').toUpperCase())}</span></td>
     <td>${c.rank ? `#${c.rank}` : '—'}</td>
@@ -1281,7 +1282,7 @@ async function discover() {
     <td class="dc-cell muted">—</td>
     <td style="white-space:nowrap">
       <button class="btn small secondary dc-find">Discord?</button>
-      <button class="btn small wl-add">+ Watch</button>
+      ${watchedIds.has(c.id) ? '<button class="btn small secondary" disabled>✓ Watching</button>' : '<button class="btn small wl-add">+ Watch</button>'}
     </td>
   </tr>`;
   const section = (title, rows) => `
@@ -1303,25 +1304,64 @@ async function discover() {
     ${section('🔥 Trending', (d.trending ?? []).map(coinRow).join(''))}
     ${section('📈 Top gainers (24h)', (d.gainers ?? []).map(coinRow).join(''))}
     ${section('🆕 New listings', (d.newListings ?? []).map(coinRow).join(''))}
-    <div class="card"><h3>📋 Outreach watchlist (${d.watchlist.length})${state.me.isOwner ? ' <span class="muted">— godmode: all users\' entries</span>' : ''}</h3>
-      <table><tr><th>Coin</th><th>Discord</th><th>Status</th><th>Notes</th>${state.me.isOwner ? '<th>Added by</th>' : ''}<th></th></tr>
-      ${d.watchlist
-        .map(
-          (w) => `<tr data-wid="${w.id}">
-          <td><b>${esc(w.name ?? w.coin_id)}</b> <span class="muted">${esc((w.symbol ?? '').toUpperCase())}</span></td>
-          <td style="white-space:nowrap">${w.discord_url ? `<a href="${esc(w.discord_url)}" target="_blank" style="color:var(--accent)">join ↗</a>` : '<span class="muted">—</span>'}${w.guild_id && w.status === 'joined' ? ` <button class="btn small secondary wl-join" data-g="${w.guild_id}" title="One-click join via OAuth">1-click join</button>` : ''}</td>
-          <td><select class="wl-status">${Object.entries(STATUS_LABELS)
-            .map(([v, l]) => `<option value="${v}" ${w.status === v ? 'selected' : ''}>${l}</option>`)
-            .join('')}</select></td>
-          <td><input class="wl-notes" value="${esc(w.notes ?? '')}" placeholder="notes…"></td>
-          ${state.me.isOwner ? `<td><code>${w.added_by}</code></td>` : ''}
-          <td><button class="btn small danger wl-del">✕</button></td>
-        </tr>`,
-        )
-        .join('') || '<tr><td colspan="6" class="muted">Watchlist is empty — click "+ Watch" on any coin above.</td></tr>'}
-      </table>
-      <p class="muted" style="margin-top:10px">Once a project adds the bot, that server appears in their dashboard's <b>Satellite</b> tab — they link it to your hub and the auto-responder takes it from there. <b>join ↗</b> opens the invite in Discord (you complete any verification yourself); <b>1-click join</b> adds your account via OAuth once the bot is installed there.</p>
+    <div class="card" id="wl-card"><h3>📋 Outreach watchlist (<span id="wl-count">${d.watchlist.length}</span>)${state.me.isOwner ? ' <span class="muted">— godmode: all users\' entries</span>' : ''}</h3>
+      <p class="muted">Your outreach pipeline: <b>watch</b> a coin → <b>find its Discord</b> → get their admins to authorize the bot (or do it yourself if you're admin) → mark the <b>status</b>. When the bot lands in the server, satellite mode auto-arms and starts routing support questions to your hub.</p>
+      <table><tr><th>Coin</th><th>Discord</th><th>Status</th><th>Notes</th>${state.me.isOwner ? '<th>Added by</th>' : ''}<th></th></tr><tbody id="wl-body"></tbody></table>
+      <p class="muted" style="margin-top:10px"><b>join ↗</b> opens the invite in Discord (you complete any verification yourself); <b>1-click join</b> adds your account via OAuth once the bot is installed there.</p>
     </div></div>`;
+  const wlRow = (w) => `<tr data-wid="${w.id}">
+      <td><b>${esc(w.name ?? w.coin_id)}</b> <span class="muted">${esc((w.symbol ?? '').toUpperCase())}</span></td>
+      <td style="white-space:nowrap">${w.discord_url ? `<a href="${esc(w.discord_url)}" target="_blank" style="color:var(--accent)">join ↗</a>` : '<span class="muted">—</span>'}${w.guild_id && w.status === 'joined' ? ` <button class="btn small secondary wl-join" data-g="${w.guild_id}" title="One-click join via OAuth">1-click join</button>` : ''}</td>
+      <td><select class="wl-status">${Object.entries(STATUS_LABELS)
+        .map(([v, l]) => `<option value="${v}" ${w.status === v ? 'selected' : ''}>${l}</option>`)
+        .join('')}</select></td>
+      <td><input class="wl-notes" value="${esc(w.notes ?? '')}" placeholder="notes…"></td>
+      ${state.me.isOwner ? `<td><code>${w.added_by}</code></td>` : ''}
+      <td><button class="btn small danger wl-del">✕</button></td>
+    </tr>`;
+  const bindWatchlistHandlers = () => {
+    document.querySelectorAll('.wl-status').forEach((el) => {
+      el.onchange = async () => {
+        await api(`/api/watchlist/${el.closest('tr').dataset.wid}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ status: el.value }),
+        });
+        notice('Status updated.');
+      };
+    });
+    document.querySelectorAll('.wl-notes').forEach((el) => {
+      el.onchange = async () => {
+        await api(`/api/watchlist/${el.closest('tr').dataset.wid}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ notes: el.value }),
+        });
+      };
+    });
+    document.querySelectorAll('.wl-join').forEach((b) => {
+      b.onclick = async () => {
+        try {
+          await api(`/api/join/${b.dataset.g}`, { method: 'POST', body: '{}' });
+          notice('Joined — check your Discord server list.');
+        } catch (e) {
+          notice(e.message === 'relogin' ? 'Log out and back in first — the join permission was added to OAuth.' : e.message, false);
+        }
+      };
+    });
+    document.querySelectorAll('.wl-del').forEach((b) => {
+      b.onclick = async () => {
+        await api(`/api/watchlist/${b.closest('tr').dataset.wid}`, { method: 'DELETE' });
+        renderWatchlist(await api('/api/watchlist'));
+      };
+    });
+  };
+  const renderWatchlist = (items) => {
+    document.getElementById('wl-count').textContent = items.length;
+    document.getElementById('wl-body').innerHTML =
+      items.map(wlRow).join('') ||
+      '<tr><td colspan="6" class="muted">Watchlist is empty — click "+ Watch" on any coin above, or paste a server invite at the top.</td></tr>';
+    bindWatchlistHandlers();
+  };
+  renderWatchlist(d.watchlist);
   document.getElementById('back').onclick = renderGuilds;
 
   document.getElementById('srv-add').onclick = async () => {
@@ -1361,6 +1401,8 @@ async function discover() {
   document.querySelectorAll('.wl-add').forEach((b) => {
     b.onclick = async () => {
       const tr = b.closest('tr');
+      b.disabled = true;
+      b.textContent = '…';
       try {
         await api('/api/watchlist', {
           method: 'POST',
@@ -1369,43 +1411,15 @@ async function discover() {
             symbol: tr.dataset.sym, discord_url: tr.dataset.dc ?? null,
           }),
         });
-        notice('Added to watchlist.');
-        discover();
+        b.outerHTML = '<button class="btn small secondary" disabled>✓ Watching</button>';
+        renderWatchlist(await api('/api/watchlist'));
+        document.getElementById('wl-card').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        notice(`${tr.dataset.name} added to your watchlist — track outreach below.`);
       } catch (e) {
+        b.disabled = false;
+        b.textContent = '+ Watch';
         notice(e.message, false);
       }
-    };
-  });
-  document.querySelectorAll('.wl-status').forEach((el) => {
-    el.onchange = async () => {
-      await api(`/api/watchlist/${el.closest('tr').dataset.wid}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: el.value }),
-      });
-    };
-  });
-  document.querySelectorAll('.wl-notes').forEach((el) => {
-    el.onchange = async () => {
-      await api(`/api/watchlist/${el.closest('tr').dataset.wid}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ notes: el.value }),
-      });
-    };
-  });
-  document.querySelectorAll('.wl-join').forEach((b) => {
-    b.onclick = async () => {
-      try {
-        await api(`/api/join/${b.dataset.g}`, { method: 'POST', body: '{}' });
-        notice('Joined — check your Discord server list.');
-      } catch (e) {
-        notice(e.message === 'relogin' ? 'Log out and back in first — the join permission was added to OAuth.' : e.message, false);
-      }
-    };
-  });
-  document.querySelectorAll('.wl-del').forEach((b) => {
-    b.onclick = async () => {
-      await api(`/api/watchlist/${b.closest('tr').dataset.wid}`, { method: 'DELETE' });
-      discover();
     };
   });
 }
