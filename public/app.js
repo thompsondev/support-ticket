@@ -32,6 +32,7 @@ function notice(msg, ok = true) {
 
 function renderLogin() {
   userChip.innerHTML = '';
+  clearNav();
   app.innerHTML = `
     <div class="card center-card">
       <h1>🎫 Ticket Bot</h1>
@@ -120,12 +121,11 @@ async function renderGuilds() {
         </table>
       </div>`;
   }
+  setGlobalNav('servers');
   app.innerHTML = `
+    <div class="page">
     ${godmodeHtml}
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
-      <h2>${state.me.isOwner ? 'All servers' : 'Your servers'}</h2>
-      <button class="btn secondary" id="discover-btn">🔍 Coin discovery</button>
-    </div>
+    <h2>${state.me.isOwner ? 'All servers' : 'Your servers'}</h2>
     <p class="muted" style="margin-bottom:16px">${
       state.me.isOwner
         ? 'Every server running the bot — click to manage.'
@@ -148,13 +148,13 @@ async function renderGuilds() {
         )
         .join('')}
     </div>
-    ${!gs.length ? '<p class="muted">No servers found.</p>' : ''}`;
+    ${!gs.length ? '<p class="muted">No servers found.</p>' : ''}
+    </div>`;
   document.querySelectorAll('.guild-card').forEach((el) => {
     el.onclick = () => {
       if (el.dataset.hasbot === 'true') openGuild(el.dataset.gid);
     };
   });
-  document.getElementById('discover-btn').onclick = discover;
   document.getElementById('gb-add')?.addEventListener('click', async () => {
     try {
       await api('/api/admin/blacklist', {
@@ -189,40 +189,71 @@ async function openGuild(gid) {
   renderGuild();
 }
 
-const TABS = [
-  ['overview', 'Overview'],
-  ['settings', 'Settings'],
-  ['types', 'Ticket Types'],
-  ['forms', 'Forms'],
-  ['links', 'Links'],
-  ['tags', 'Tags'],
-  ['suggestions', 'Suggestions'],
-  ['tickets', 'Tickets'],
-  ['transcripts', 'Transcripts'],
-  ['giveaways', 'Giveaways'],
-  ['rroles', 'Reaction Roles'],
-  ['sticky', 'Sticky'],
-  ['automod', 'AutoMod'],
-  ['commands', 'Commands'],
-  ['blacklist', 'Blacklist'],
-  ['audit', 'Audit'],
-  ['satellite', 'Satellite'],
-  ['panel', 'Panel'],
+const NAV = [
+  ['SUPPORT', [
+    ['overview', 'Overview'],
+    ['tickets', 'Tickets'],
+    ['transcripts', 'Transcripts'],
+    ['panel', 'Panel'],
+    ['types', 'Ticket Types'],
+    ['forms', 'Forms'],
+  ]],
+  ['COMMUNITY', [
+    ['suggestions', 'Suggestions'],
+    ['giveaways', 'Giveaways'],
+    ['rroles', 'Reaction Roles'],
+    ['sticky', 'Sticky'],
+    ['links', 'Links'],
+    ['tags', 'Tags'],
+    ['commands', 'Commands'],
+  ]],
+  ['MODERATION', [
+    ['automod', 'AutoMod'],
+    ['blacklist', 'Blacklist'],
+  ]],
+  ['SYSTEM', [
+    ['satellite', 'Satellite'],
+    ['settings', 'Settings'],
+    ['audit', 'Audit'],
+  ]],
 ];
+
+function clearNav() {
+  document.getElementById('sidebar-nav').innerHTML = '';
+}
+
+// top-level nav (server list / discover) when no guild is open
+function setGlobalNav(active) {
+  document.getElementById('sidebar-nav').innerHTML = `
+    <div class="nav-group">MENU</div>
+    <div class="nav-item ${active === 'servers' ? 'active' : ''}" data-nav="servers">🖥 Servers</div>
+    <div class="nav-item ${active === 'discover' ? 'active' : ''}" data-nav="discover">🔍 Coin discovery</div>`;
+  document.querySelectorAll('[data-nav]').forEach(
+    (el) => (el.onclick = () => (el.dataset.nav === 'discover' ? discover() : renderGuilds())),
+  );
+}
 
 function renderGuild() {
   const g = state.guild;
+  document.getElementById('sidebar-nav').innerHTML = `
+    <div class="nav-back" id="back">← All servers</div>
+    <div class="nav-guild">
+      ${g.icon
+        ? `<img src="https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=64" alt="">`
+        : `<div class="nav-guild-initial">${esc(g.name[0] ?? '?')}</div>`}
+      <div><div class="nav-guild-name">${esc(g.name)}</div><div class="muted" style="font-size:11px">${g.memberCount ?? '?'} members</div></div>
+    </div>
+    ${NAV.map(([grp, items]) => `
+      <div class="nav-group">${grp}</div>
+      ${items.map(([id, lbl]) => `<div class="nav-item ${state.tab === id ? 'active' : ''}" data-tab="${id}">${lbl}</div>`).join('')}
+    `).join('')}`;
   app.innerHTML = `
-    <span class="back" id="back">← All servers</span>
-    <h2>${esc(g.name)}</h2>
-    <div class="tabs">${TABS.map(
-      ([id, lbl]) =>
-        `<div class="tab ${state.tab === id ? 'active' : ''}" data-tab="${id}">${lbl}</div>`,
-    ).join('')}</div>
-    <div id="notice" class="notice" style="display:none"></div>
-    <div id="tab-body"></div>`;
-  document.getElementById('back').onclick = renderGuilds;
-  document.querySelectorAll('.tab').forEach(
+    <div class="page">
+      <div id="notice" class="notice" style="display:none"></div>
+      <div id="tab-body"></div>
+    </div>`;
+  document.getElementById('back').onclick = () => { state.guild = null; renderGuilds(); };
+  document.querySelectorAll('.nav-item').forEach(
     (t) => (t.onclick = () => { state.tab = t.dataset.tab; renderGuild(); }),
   );
   ({ overview, settings, types, forms, links, tags, suggestions, tickets, transcripts, giveaways, rroles, sticky, automod, commands, blacklist, audit, satellite, panel })[state.tab]();
@@ -1225,7 +1256,8 @@ async function satellite() {
 const STATUS_LABELS = { new: '🆕 new', contacted: '✉️ contacted', joined: '✅ joined', rejected: '❌ rejected' };
 
 async function discover() {
-  app.innerHTML = `<span class="back" id="back">← Servers</span>
+  setGlobalNav('discover');
+  app.innerHTML = `<div class="page"><span class="back" id="back">← Servers</span>
     <h2>🔍 Coin discovery</h2>
     <p class="muted">Trending coins from CoinGecko — find their Discord, pitch the bot, then track the outreach in the watchlist. Satellite mode takes over once the bot is in their server.</p>
     <div class="loading">Loading market data…</div>`;
@@ -1257,7 +1289,7 @@ async function discover() {
       <table><tr><th>Coin</th><th>Rank</th><th>24h</th><th>Price</th><th>Discord</th><th></th></tr>${rows}</table>
     </div>`;
 
-  app.innerHTML = `<span class="back" id="back">← Servers</span>
+  app.innerHTML = `<div class="page"><span class="back" id="back">← Servers</span>
     <h2>🔍 Coin discovery</h2>
     <div class="card">
       <h3>➕ Add a coin server by invite</h3>
@@ -1289,7 +1321,7 @@ async function discover() {
         .join('') || '<tr><td colspan="6" class="muted">Watchlist is empty — click "+ Watch" on any coin above.</td></tr>'}
       </table>
       <p class="muted" style="margin-top:10px">Once a project adds the bot, that server appears in their dashboard's <b>Satellite</b> tab — they link it to your hub and the auto-responder takes it from there. <b>join ↗</b> opens the invite in Discord (you complete any verification yourself); <b>1-click join</b> adds your account via OAuth once the bot is installed there.</p>
-    </div>`;
+    </div></div>`;
   document.getElementById('back').onclick = renderGuilds;
 
   document.getElementById('srv-add').onclick = async () => {
