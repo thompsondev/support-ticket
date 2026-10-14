@@ -1,11 +1,15 @@
 import {
   ActivityType,
+  ApplicationCommandType,
+  ApplicationIntegrationType,
   ChannelType,
   Client,
+  ContextMenuCommandBuilder,
   EmbedBuilder,
   Guild,
   Events,
   GatewayIntentBits,
+  InteractionContextType,
   MessageFlags,
   MessageReaction,
   PartialMessageReaction,
@@ -14,11 +18,13 @@ import {
   REST,
   Routes,
 } from 'discord.js';
+import type { RESTPostAPIApplicationCommandsJSONBody } from 'discord-api-types/v10';
 import { env, validateEnv } from './env';
 import { commands } from './commands';
 import { onInteraction } from './interactions';
 import { autoCloseSweep, logToGuild } from './tickets';
 import {
+  addReferral,
   addTempVoice,
   clearAfk,
   convertReferral,
@@ -49,7 +55,7 @@ import {
 import { endPoll } from './votes';
 import { endGiveaway } from './giveaways';
 import { welcomeCard } from './cards';
-import { handleSatelliteMessage } from './satellites';
+import { handleSatelliteMessage, satelliteReplyText } from './satellites';
 import { ephemeral, isOwnerId, isStaff, COLORS } from './util';
 import { startWeb } from './web';
 
@@ -69,13 +75,50 @@ const client = new Client({
 
 async function registerCommands(): Promise<void> {
   const rest = new REST().setToken(env.token);
-  const body = [...commands.values()].map((c) => c.data.toJSON());
+  // "Route to Support" — message context command installable on a USER's
+  // account, so it works in servers where the bot is not a member.
+  const contextCmds = [
+    new ContextMenuCommandBuilder()
+      .setName('Route to Support')
+      .setType(ApplicationCommandType.Message)
+      .setIntegrationTypes(
+        ApplicationIntegrationType.GuildInstall,
+        ApplicationIntegrationType.UserInstall,
+      )
+      .setContexts(
+        InteractionContextType.Guild,
+        InteractionContextType.BotDM,
+        InteractionContextType.PrivateChannel,
+      )
+      .toJSON() as RESTPostAPIApplicationCommandsJSONBody,
+  ];
+  const body: RESTPostAPIApplicationCommandsJSONBody[] = [
+    ...[...commands.values()].map(
+      (c) => c.data.toJSON() as RESTPostAPIApplicationCommandsJSONBody,
+    ),
+    ...contextCmds,
+  ];
   if (env.guildId) {
     await rest.put(Routes.applicationGuildCommands(env.clientId, env.guildId), { body });
     console.log(`Registered ${body.length} commands to guild ${env.guildId}`);
   } else {
     await rest.put(Routes.applicationCommands(env.clientId), { body });
     console.log(`Registered ${body.length} commands globally`);
+  }
+  // enable user-installable commands on the application (dev portal →
+  // Installation → User Install). Best-effort — some apps must toggle it
+  // in the portal instead.
+  try {
+    await rest.patch(Routes.currentApplication(), {
+      body: {
+        integration_types_config: {
+          '0': {},
+          '1': { oauth2_install_params: { scopes: ['applications.commands'], permissions: '0' } },
+        },
+      },
+    });
+  } catch (err) {
+    console.warn('Could not set user-install via API — enable "User Install" in dev portal → Installation.', err);
   }
 }
 
@@ -166,6 +209,28 @@ client.on(Events.InteractionCreate, async (i) => {
       }
       const cmd = commands.get(i.commandName);
       if (cmd) await cmd.execute(i);
+      return;
+    }
+    // user-installable context command — works even in servers where the bot
+    // isn't installed. Right-click a member's message → Apps → Route to Support.
+    if (i.isMessageContextMenuCommand() && i.commandName === 'Route to Support') {
+      if (!env.hubInvite) {
+        await i.reply({ content: 'The support hub invite is not configured (HUB_INVITE).', flags: MessageFlags.Ephemeral });
+        return;
+      }
+      const target = i.targetMessage;
+      const guildName = i.guild?.name ?? 'this community';
+      const text = await satelliteReplyText(
+        { hub_invite: env.hubInvite, reply_text: null, ai_enabled: 1 },
+        target.content || 'a support request',
+        guildName,
+      );
+      await i.reply({
+        embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription(text)],
+      });
+      if (i.guildId && !target.author.bot) {
+        await addReferral(i.guildId, target.author.id, i.channelId ?? '', target.id).catch(() => {});
+      }
       return;
     }
     await onInteraction(i);

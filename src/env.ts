@@ -22,6 +22,9 @@ export const env = {
   // support hub guild — where referred users land. Enables the landing-page
   // "Get Support" one-click join (requires the guilds.join OAuth scope).
   hubGuildId: process.env.HUB_GUILD_ID ?? '',
+  // public invite URL for the hub — used by the user-installable
+  // "Route to Support" context command and satellite auto-arm
+  hubInvite: process.env.HUB_INVITE ?? '',
   // godmode — comma-separated Discord user IDs of bot owners
   ownerIds: (process.env.OWNER_IDS ?? '')
     .split(',')

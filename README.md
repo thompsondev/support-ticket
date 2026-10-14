@@ -149,6 +149,16 @@ A compliant way to route users from partner communities into your ticket server:
 
 AI config: `NEON_AI_GATEWAY_BASE_URL` + `NEON_AI_GATEWAY_TOKEN` (+ optional `AI_MODEL`). Without them, satellites still work on keyword matching; AI triage/drafting is skipped.
 
+### "Route to Support" — user-installable context command
+
+For servers where the bot is **not** installed, Discord's user-installable apps still give you a manual routing action. One-time setup:
+
+1. Dev portal → your app → **Installation** → enable **User Install** (the bot also attempts this via the API at startup)
+2. Set `HUB_INVITE` to your hub's public invite URL
+3. On the bot's profile click **Add App** → **Use it everywhere**
+
+Then in any server you're a member of: right-click a member's question/complaint → **Apps → Route to Support** → the app posts a public reply (AI-drafted when the gateway is configured) inviting them to your hub, and logs a referral. This is a user-triggered action — it does not monitor or auto-respond in guilds that never authorized the bot.
+
 ## Customization
 
 `config.json` defines the **defaults seeded for each new guild**:
