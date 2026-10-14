@@ -45,9 +45,25 @@ function renderUserChip() {
   const avatar = u.avatar
     ? `<img src="https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64">`
     : '';
-  userChip.innerHTML = `<div class="user-chip">${state.me.isOwner ? '<span class="godmode-badge">⚡ GODMODE</span>' : ''}${avatar}<span>${esc(
+  const accts = state.me.accounts ?? [];
+  const switcher =
+    accts.length > 1
+      ? `<select id="acct-switch" title="Switch account">${accts
+          .map((a) => `<option value="${a.id}" ${a.id === u.id ? 'selected' : ''}>@${esc(a.username)}</option>`)
+          .join('')}</select>`
+      : '';
+  userChip.innerHTML = `<div class="user-chip">${state.me.isOwner ? '<span class="godmode-badge">⚡ GODMODE</span>' : ''}${avatar}${switcher || `<span>${esc(
     u.global_name || u.username,
-  )}</span><a class="btn small secondary" href="/auth/logout">Logout</a></div>`;
+  )}</span>`}<a class="btn small secondary" href="/auth/discord?add=1" title="Add another Discord account">+</a><a class="btn small secondary" href="/auth/logout">Logout</a></div>`;
+  document.getElementById('acct-switch')?.addEventListener('change', async (e) => {
+    await api('/api/accounts/switch', {
+      method: 'POST',
+      body: JSON.stringify({ accountId: e.target.value }),
+    });
+    state.me = await api('/api/me');
+    renderUserChip();
+    renderGuilds();
+  });
 }
 
 function inviteUrl(gid) {
@@ -1243,6 +1259,15 @@ async function discover() {
 
   app.innerHTML = `<span class="back" id="back">← Servers</span>
     <h2>🔍 Coin discovery</h2>
+    <div class="card">
+      <h3>➕ Add a coin server by invite</h3>
+      <p class="muted">Paste a coin project's Discord invite. The bot previews the server (it doesn't join) — if you or their admins authorize it via the link below, satellite mode arms itself automatically.</p>
+      <div class="inline-form">
+        <div style="flex:2"><input id="srv-invite" placeholder="https://discord.gg/coinserver"></div>
+        <button class="btn" id="srv-add">Track server</button>
+      </div>
+      <div id="srv-result" style="margin-top:10px"></div>
+    </div>
     ${section('🔥 Trending', (d.trending ?? []).map(coinRow).join(''))}
     ${section('📈 Top gainers (24h)', (d.gainers ?? []).map(coinRow).join(''))}
     ${section('🆕 New listings', (d.newListings ?? []).map(coinRow).join(''))}
@@ -1252,7 +1277,7 @@ async function discover() {
         .map(
           (w) => `<tr data-wid="${w.id}">
           <td><b>${esc(w.name ?? w.coin_id)}</b> <span class="muted">${esc((w.symbol ?? '').toUpperCase())}</span></td>
-          <td>${w.discord_url ? `<a href="${esc(w.discord_url)}" target="_blank" style="color:var(--accent)">link ↗</a>` : '<span class="muted">—</span>'}</td>
+          <td style="white-space:nowrap">${w.discord_url ? `<a href="${esc(w.discord_url)}" target="_blank" style="color:var(--accent)">join ↗</a>` : '<span class="muted">—</span>'}${w.guild_id && w.status === 'joined' ? ` <button class="btn small secondary wl-join" data-g="${w.guild_id}" title="One-click join via OAuth">1-click join</button>` : ''}</td>
           <td><select class="wl-status">${Object.entries(STATUS_LABELS)
             .map(([v, l]) => `<option value="${v}" ${w.status === v ? 'selected' : ''}>${l}</option>`)
             .join('')}</select></td>
@@ -1263,9 +1288,27 @@ async function discover() {
         )
         .join('') || '<tr><td colspan="6" class="muted">Watchlist is empty — click "+ Watch" on any coin above.</td></tr>'}
       </table>
-      <p class="muted" style="margin-top:10px">Once a project adds the bot, that server appears in their dashboard's <b>Satellite</b> tab — they link it to your hub and the auto-responder takes it from there.</p>
+      <p class="muted" style="margin-top:10px">Once a project adds the bot, that server appears in their dashboard's <b>Satellite</b> tab — they link it to your hub and the auto-responder takes it from there. <b>join ↗</b> opens the invite in Discord (you complete any verification yourself); <b>1-click join</b> adds your account via OAuth once the bot is installed there.</p>
     </div>`;
   document.getElementById('back').onclick = renderGuilds;
+
+  document.getElementById('srv-add').onclick = async () => {
+    const el = document.getElementById('srv-result');
+    el.innerHTML = '<span class="muted">Checking invite…</span>';
+    try {
+      const r = await api('/api/watchlist/invite', {
+        method: 'POST',
+        body: JSON.stringify({ invite: document.getElementById('srv-invite').value.trim() }),
+      });
+      el.innerHTML = r.installed
+        ? `<span class="pill open">✅ Bot is already in <b>${esc(r.guild.name)}</b></span> — open its dashboard → Satellite tab to link your hub.`
+        : `Tracked <b>${esc(r.guild.name)}</b>${r.guild.members ? ` (${r.guild.members.toLocaleString()} members)` : ''}. ` +
+          `Authorize the bot there (needs Manage Server — share this with their admins): ` +
+          `<a href="${r.authUrl}" target="_blank" style="color:var(--accent)">authorize ↗</a> — once it lands, satellite mode auto-arms.`;
+    } catch (e) {
+      el.innerHTML = `<span class="pill closed">${esc(e.message === 'invalid_invite' ? 'Invalid or expired invite' : e.message)}</span>`;
+    }
+  };
 
   document.querySelectorAll('.dc-find').forEach((b) => {
     b.onclick = async () => {
@@ -1315,6 +1358,16 @@ async function discover() {
         method: 'PATCH',
         body: JSON.stringify({ notes: el.value }),
       });
+    };
+  });
+  document.querySelectorAll('.wl-join').forEach((b) => {
+    b.onclick = async () => {
+      try {
+        await api(`/api/join/${b.dataset.g}`, { method: 'POST', body: '{}' });
+        notice('Joined — check your Discord server list.');
+      } catch (e) {
+        notice(e.message === 'relogin' ? 'Log out and back in first — the join permission was added to OAuth.' : e.message, false);
+      }
     };
   });
   document.querySelectorAll('.wl-del').forEach((b) => {

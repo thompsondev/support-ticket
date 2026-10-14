@@ -10,6 +10,7 @@ import {
   MessageReaction,
   PartialMessageReaction,
   Partials,
+  PermissionFlagsBits,
   REST,
   Routes,
 } from 'discord.js';
@@ -23,6 +24,7 @@ import {
   convertReferral,
   dbRun,
   deleteReminder,
+  findWatchByGuild,
   dueReminders,
   expiredGiveaways,
   expiredPolls,
@@ -38,8 +40,10 @@ import {
   isTempVoice,
   listCustomCommands,
   removeTempVoice,
+  setSatellite,
   updateSticky,
   updateTicket,
+  updateWatch,
   upsertStarEntry,
 } from './db';
 import { endPoll } from './votes';
@@ -444,6 +448,61 @@ client.on(Events.GuildMemberAdd, async (member) => {
         })
         .catch(() => {});
     }
+  }
+});
+
+// ---------- satellite auto-arm on join ----------
+
+// When the bot is authorized into a guild that someone tracked via the
+// dashboard's "add coin server" flow, mark the watchlist entry joined and —
+// if this instance has a hub configured — arm satellite mode automatically.
+client.on(Events.GuildCreate, async (guild) => {
+  try {
+    const w = await findWatchByGuild(guild.id);
+    if (!w) return; // organic install — admin configures via /satellite or dashboard
+    if (w.status !== 'joined') await updateWatch(w.id, { status: 'joined' }).catch(() => {});
+
+    if (!env.hubGuildId || (await getSatellite(guild.id))) return;
+    const hub =
+      client.guilds.cache.get(env.hubGuildId) ??
+      (await client.guilds.fetch(env.hubGuildId).catch(() => null));
+    let inviteUrl = '';
+    if (hub) {
+      const chan = hub.channels.cache.find(
+        (c) =>
+          c.isTextBased() &&
+          !c.isThread() &&
+          'createInvite' in c &&
+          c.permissionsFor(client.user!.id)?.has(PermissionFlagsBits.CreateInstantInvite),
+      );
+      const inv =
+        chan && 'createInvite' in chan
+          ? await chan.createInvite({ maxAge: 0, maxUses: 0, reason: 'satellite auto-link' }).catch(() => null)
+          : null;
+      inviteUrl = inv?.url ?? '';
+    }
+    await setSatellite(guild.id, env.hubGuildId, inviteUrl || 'ask the hub admin for the invite', {
+      enabled: inviteUrl ? 1 : 0,
+    });
+    const sc = guild.systemChannel;
+    if (sc?.isSendable()) {
+      await sc
+        .send({
+          embeds: [
+            new EmbedBuilder()
+              .setTitle('🛰️ Satellite mode armed')
+              .setColor(COLORS.info)
+              .setDescription(
+                `This server is linked to the support hub **${hub?.name ?? env.hubGuildId}**. ` +
+                  'Support questions here get an automatic reply with the hub invite.\n' +
+                  'Admins: `/satellite status` to review, `/satellite toggle` to pause, `/satellite unlink` to remove.',
+              ),
+          ],
+        })
+        .catch(() => {});
+    }
+  } catch (err) {
+    console.error('GuildCreate satellite error:', err);
   }
 });
 

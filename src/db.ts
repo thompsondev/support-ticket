@@ -361,6 +361,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
   discord_url TEXT,
   status TEXT NOT NULL DEFAULT 'new',
   notes TEXT,
+  guild_id TEXT,
+  invite_code TEXT,
   created_at INTEGER NOT NULL
 );
 `;
@@ -635,6 +637,8 @@ CREATE TABLE IF NOT EXISTS watchlist (
   discord_url TEXT,
   status TEXT NOT NULL DEFAULT 'new',
   notes TEXT,
+  guild_id TEXT,
+  invite_code TEXT,
   created_at BIGINT NOT NULL
 );
 `;
@@ -687,6 +691,12 @@ async function initSchema(): Promise<void> {
     for (const col of TICKET_INT_COLS) {
       if (!ticketCols.includes(col)) sqlite.exec(`ALTER TABLE tickets ADD COLUMN ${col} INTEGER`);
     }
+    const wlCols = (sqlite.prepare('PRAGMA table_info(watchlist)').all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+    for (const col of ['guild_id', 'invite_code']) {
+      if (!wlCols.includes(col)) sqlite.exec(`ALTER TABLE watchlist ADD COLUMN ${col} TEXT`);
+    }
     return;
   }
   const p = pg!;
@@ -699,6 +709,9 @@ async function initSchema(): Promise<void> {
   }
   for (const col of TICKET_INT_COLS) {
     await p.query(`ALTER TABLE tickets ADD COLUMN IF NOT EXISTS ${col} BIGINT`);
+  }
+  for (const col of ['guild_id', 'invite_code']) {
+    await p.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS ${col} TEXT`);
   }
 }
 
@@ -1625,6 +1638,8 @@ export interface WatchRow {
   discord_url: string | null;
   status: 'new' | 'contacted' | 'joined' | 'rejected';
   notes: string | null;
+  guild_id: string | null;
+  invite_code: string | null;
   created_at: number;
 }
 
@@ -1634,6 +1649,21 @@ export async function addWatch(addedBy: string, coinId: string, symbol: string |
     [addedBy, coinId, symbol, name, discordUrl, Date.now()],
   );
   return res.lastId;
+}
+
+/** Watchlist entry for a manually-added coin *server* (no CoinGecko coin). */
+export async function addWatchGuild(
+  addedBy: string, guildId: string, name: string, inviteCode: string, discordUrl: string,
+): Promise<number> {
+  const res = await D.run(
+    'INSERT INTO watchlist (added_by, coin_id, name, discord_url, guild_id, invite_code, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [addedBy, `server:${guildId}`, name.slice(0, 80), discordUrl.slice(0, 200), guildId, inviteCode, Date.now()],
+  );
+  return res.lastId;
+}
+
+export async function findWatchByGuild(guildId: string): Promise<WatchRow | undefined> {
+  return await D.get('SELECT * FROM watchlist WHERE guild_id = ? ORDER BY id DESC LIMIT 1', [guildId]) as WatchRow | undefined;
 }
 
 export async function getWatch(id: number): Promise<WatchRow | undefined> {

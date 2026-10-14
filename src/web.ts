@@ -28,6 +28,8 @@ import {
   getSticky,
   getSuggestions,
   addWatch,
+  addWatchGuild,
+  findWatchByGuild,
   getAuditLog,
   getSatellite,
   getWatch,
@@ -99,6 +101,9 @@ declare module 'express-session' {
     csrf?: string;
     accessToken?: string;
     pendingJoin?: string;
+    // every Discord account authorized into this session — `user`/`guilds`/
+    // `accessToken` are always the snapshot of the ACTIVE one
+    accounts?: { id: string; username: string; avatar: string; accessToken: string }[];
   }
 }
 
@@ -229,13 +234,16 @@ export function startWeb(client: Client): void {
     req.session.oauthState = state;
     if (req.query.join === '1' && env.hubGuildId) req.session.pendingJoin = env.hubGuildId;
     const url = new URL('https://discord.com/oauth2/authorize');
-    url.search = new URLSearchParams({
+    const params: Record<string, string> = {
       client_id: env.clientId,
       redirect_uri: redirectUri,
       response_type: 'code',
       scope: 'identify guilds guilds.join',
       state,
-    }).toString();
+    };
+    // ?add=1 → force the authorize screen so the user can pick ANOTHER Discord account
+    if (req.query.add === '1') params.prompt = 'consent';
+    url.search = new URLSearchParams(params).toString();
     res.redirect(url.toString());
   });
 
@@ -271,7 +279,13 @@ export function startWeb(client: Client): void {
       req.session.user = user;
       req.session.guilds = guilds;
       req.session.accessToken = access_token;
-      req.session.csrf = randomBytes(16).toString('hex');
+      req.session.csrf ??= randomBytes(16).toString('hex');
+      // register/update this account in the session's account list
+      const acct = { id: user.id, username: user.username, avatar: user.avatar ?? '', accessToken: access_token };
+      const accts = (req.session.accounts ??= []);
+      const idx = accts.findIndex((a) => a.id === acct.id);
+      if (idx >= 0) accts[idx] = acct;
+      else accts.push(acct);
 
       // one-click join: "Get Support" on the landing page drops the user into
       // the hub guild via guilds.join right after they authorize.
@@ -354,7 +368,31 @@ export function startWeb(client: Client): void {
         disabled: client.guilds.cache.has(g.id) ? !!(await getConfig(g.id)).disabled : false,
       });
     }
-    res.json({ user: req.session.user, guilds, clientId: env.clientId, isOwner: owner, csrf: req.session.csrf });
+    res.json({
+      user: req.session.user,
+      guilds,
+      clientId: env.clientId,
+      isOwner: owner,
+      csrf: req.session.csrf,
+      accounts: (req.session.accounts ?? []).map(({ id, username, avatar }) => ({ id, username, avatar })),
+    });
+  });
+
+  // switch the session's active Discord identity to a previously-authorized account
+  app.post('/api/accounts/switch', authed, async (req, res) => {
+    const { accountId } = req.body ?? {};
+    const acct = (req.session.accounts ?? []).find((a) => a.id === accountId);
+    if (!acct) return res.status(404).json({ error: 'account_not_found' });
+    const headers = { Authorization: `Bearer ${acct.accessToken}` };
+    const [user, guilds] = await Promise.all([
+      fetch(`${DISCORD_API}/users/@me`, { headers }).then((r) => r.json() as Promise<DiscordUser>),
+      fetch(`${DISCORD_API}/users/@me/guilds`, { headers }).then((r) => r.json() as Promise<DiscordGuild[]>),
+    ]);
+    if (!user?.id) return res.status(502).json({ error: 'token_expired' });
+    req.session.user = user;
+    req.session.guilds = guilds;
+    req.session.accessToken = acct.accessToken;
+    res.json({ ok: true, user: { id: user.id, username: user.username } });
   });
 
   // ---------- godmode (owner) ----------
@@ -1090,6 +1128,35 @@ export function startWeb(client: Client): void {
       return res.status(403).json({ error: 'not_yours' });
     }
     res.json({ ok: await removeWatch(Number(req.params.id)) });
+  });
+
+  // paste a coin server's invite — the bot previews it (no join needed), tracks it
+  // in the watchlist, and returns the authorize URL for whoever has Manage Server
+  app.post('/api/watchlist/invite', authed, async (req, res) => {
+    const { invite } = req.body ?? {};
+    if (typeof invite !== 'string' || !invite.trim()) {
+      return res.status(400).json({ error: 'bad_invite' });
+    }
+    const code =
+      invite.trim().match(/(?:discord\.gg\/|discord\.com\/invite\/)([\w-]+)/i)?.[1] ?? invite.trim();
+    const inv = await client.fetchInvite(code).catch(() => null);
+    if (!inv?.guild) return res.status(400).json({ error: 'invalid_invite' });
+
+    const installed = client.guilds.cache.has(inv.guild.id);
+    if (!(await findWatchByGuild(inv.guild.id))) {
+      const id = await addWatchGuild(
+        req.session.user!.id, inv.guild.id, inv.guild.name, code, `https://discord.gg/${code}`,
+      );
+      if (installed) await updateWatch(id, { status: 'joined' });
+    }
+    res.json({
+      ok: true,
+      guild: { id: inv.guild.id, name: inv.guild.name, members: inv.memberCount ?? null },
+      installed,
+      authUrl:
+        `https://discord.com/oauth2/authorize?client_id=${env.clientId}` +
+        `&scope=bot%20applications.commands&permissions=1099780071478&guild_id=${inv.guild.id}&disable_guild_select=true`,
+    });
   });
 
   // ---------- one-click join (guilds.join OAuth scope) ----------
