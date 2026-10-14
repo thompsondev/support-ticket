@@ -1,0 +1,17 @@
+{
+  "ticketTypes": [
+    { "id": "general", "label": "General Support", "description": "Questions and general help", "emoji": "🎫" },
+    { "id": "bug", "label": "Bug Report", "description": "Report a bug or unexpected behaviour", "emoji": "🐛" },
+    { "id": "billing", "label": "Billing", "description": "Payments, refunds and invoices", "emoji": "💳" },
+    { "id": "report", "label": "Report a User", "description": "Report rule-breaking behaviour", "emoji": "🚨" }
+  ],
+  "links": [
+    { "label": "Website", "url": "https://example.com", "description": "Our main website" },
+    { "label": "Documentation", "url": "https://docs.example.com", "description": "Guides and API docs" },
+    { "label": "Status Page", "url": "https://status.example.com", "description": "Live service status" }
+  ],
+  "panel": {
+    "title": "Support Tickets",
+    "description": "Need help? Choose a category below to open a private ticket with our team.\nPlease describe your issue in detail so we can help faster."
+  }
+}

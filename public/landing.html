@@ -1,0 +1,177 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ticket Bot — Support, moderation & community hub for Discord</title>
+  <style>
+    :root {
+      --bg: #1e1f22; --bg2: #2b2d31; --bg3: #313338;
+      --border: #3f4147; --text: #dbdee1; --muted: #949ba4;
+      --accent: #5865f2; --green: #57f287; --gold: #fee75c;
+    }
+    * { box-sizing: border-box; margin: 0; }
+    body {
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg); color: var(--text); min-height: 100vh;
+    }
+    nav {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 16px 32px; border-bottom: 1px solid var(--border);
+      position: sticky; top: 0; background: var(--bg); z-index: 10;
+    }
+    .brand { font-weight: 800; font-size: 19px; }
+    .brand span { color: var(--accent); }
+    .btn {
+      display: inline-block; padding: 10px 20px; border-radius: 8px;
+      background: var(--accent); color: #fff; font-weight: 600; font-size: 15px;
+      text-decoration: none; transition: filter .15s;
+    }
+    .btn:hover { filter: brightness(1.12); }
+    .btn.ghost { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+    .hero {
+      text-align: center; padding: 90px 24px 70px;
+      background: radial-gradient(ellipse at 50% -20%, rgba(88,101,242,.35), transparent 60%);
+    }
+    .hero h1 { font-size: clamp(32px, 5vw, 52px); line-height: 1.15; margin-bottom: 18px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p { color: var(--muted); font-size: 18px; max-width: 620px; margin: 0 auto 32px; }
+    .cta { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
+    .cta .btn { font-size: 16px; padding: 13px 26px; }
+
+    section { max-width: 1020px; margin: 0 auto; padding: 56px 24px; }
+    section h2 { text-align: center; font-size: 30px; margin-bottom: 8px; }
+    section .sub { text-align: center; color: var(--muted); margin-bottom: 40px; }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; }
+    .feat {
+      background: var(--bg2); border: 1px solid var(--border); border-radius: 10px;
+      padding: 22px; transition: border-color .15s, transform .15s;
+    }
+    .feat:hover { border-color: var(--accent); transform: translateY(-2px); }
+    .feat .ico { font-size: 26px; margin-bottom: 10px; }
+    .feat h3 { font-size: 17px; margin-bottom: 8px; }
+    .feat p { color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+    .cmd-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+    .cg { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 20px; }
+    .cg h3 { color: var(--accent); font-size: 15px; text-transform: uppercase; letter-spacing: .6px; margin-bottom: 12px; }
+    .cg code {
+      display: inline-block; background: var(--bg3); border-radius: 4px;
+      padding: 2px 7px; margin: 2px 2px; font-size: 13px;
+    }
+
+    .stats { display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; }
+    .stats div { text-align: center; }
+    .stats .n { font-size: 34px; font-weight: 800; color: var(--green); }
+    .stats .l { color: var(--muted); font-size: 14px; }
+
+    .final {
+      text-align: center; padding: 70px 24px;
+      background: linear-gradient(180deg, transparent, rgba(88,101,242,.15));
+    }
+    footer {
+      border-top: 1px solid var(--border); padding: 24px 32px;
+      display: flex; justify-content: space-between; color: var(--muted); font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+  <nav>
+    <div class="brand">🎫 Ticket<span>Bot</span></div>
+    <div>
+      <a class="btn ghost" href="#features" style="margin-right:10px">Features</a>
+      <a class="btn" href="/dashboard">Dashboard</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <h1>Support tickets, moderation<br>&amp; community — <em>one bot</em></h1>
+    <p>
+      An enterprise-grade, multi-server Discord hub. Ticket workflows with transcripts
+      and ratings, full moderation suite, giveaways, polls, suggestions, AutoMod —
+      all configurable per-server from slash commands or the web dashboard.
+    </p>
+    <div class="cta">
+      <a class="btn" id="invite-btn" href="/auth/discord">➕ Add to Discord</a>
+      <a class="btn ghost" href="/dashboard">Open Dashboard →</a>
+      <a class="btn ghost" id="support-btn" href="/auth/discord?join=1" style="display:none">🎫 Get Support</a>
+    </div>
+  </div>
+
+  <section id="features">
+    <h2>Everything your server needs</h2>
+    <p class="sub">Per-guild isolation — every server gets its own config, types, links and data.</p>
+    <div class="grid">
+      <div class="feat"><div class="ico">🎫</div><h3>Full ticket system</h3><p>Panels with dropdown or buttons, modal intake forms, private channels, claiming, priorities, notes, ticket types per server.</p></div>
+      <div class="feat"><div class="ico">📄</div><h3>Transcripts & ratings</h3><p>Self-contained HTML transcripts on close, posted to a log channel, plus a 1–5 star DM rating flow with feedback.</p></div>
+      <div class="feat"><div class="ico">🔨</div><h3>Moderation suite</h3><p>Warn / kick / ban / timeout with persistent warning history, DM notifications and a complete event log channel.</p></div>
+      <div class="feat"><div class="ico">🛡️</div><h3>Native AutoMod</h3><p>Keyword blocklists, spam detection, mass-mention limits and invite-link blocking — managed via <code>/automod</code>.</p></div>
+      <div class="feat"><div class="ico">🎉</div><h3>Giveaways & polls</h3><p>Timed giveaways with live entry counts and winner rolls; button-vote polls with auto-close and winner announcements.</p></div>
+      <div class="feat"><div class="ico">💡</div><h3>Suggestions box</h3><p>Member suggestions with 👍/👎 voting and a staff status workflow — pending → approved → implemented.</p></div>
+      <div class="feat"><div class="ico">⚡</div><h3>Godmode</h3><p>Bot owners get fleet-wide control: global blacklist, per-server kill switch, force-leave, and stats across every guild.</p></div>
+      <div class="feat"><div class="ico">🖥️</div><h3>Web dashboard</h3><p>Discord OAuth2 login — configure ticket types, roles, links, welcome messages and more without touching Discord.</p></div>
+      <div class="feat"><div class="ico">🧩</div><h3>And more…</h3><p>Reaction roles, sticky messages, AFK status, reminders, welcome + autorole, audit logging, canned replies, announcements.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="stats">
+      <div><div class="n">21</div><div class="l">slash commands</div></div>
+      <div><div class="n">10</div><div class="l">dashboard tabs</div></div>
+      <div><div class="n">∞</div><div class="l">servers, one instance</div></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Command overview</h2>
+    <p class="sub">Everything is a slash command — nothing to memorize.</p>
+    <div class="cmd-groups">
+      <div class="cg"><h3>Members</h3>
+        <code>/link show</code><code>/suggest new</code><code>/tag send</code>
+        <code>/remind set</code><code>/afk</code><code>/userinfo</code><code>/serverinfo</code>
+      </div>
+      <div class="cg"><h3>Staff</h3>
+        <code>/panel</code><code>/ticket</code><code>/types</code><code>/mod</code>
+        <code>/blacklist</code><code>/giveaway</code><code>/poll</code><code>/announce</code>
+        <code>/sticky</code><code>/reactionrole</code><code>/tag add</code><code>/link add</code><code>/stats</code>
+      </div>
+      <div class="cg"><h3>Admins</h3>
+        <code>/setup</code><code>/automod</code>
+        <span style="color:var(--muted);font-size:13px"> + full web dashboard</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="final">
+    <h2 style="margin-bottom:14px">Ready when you are</h2>
+    <p style="color:var(--muted);margin-bottom:28px">Invite the bot, run <code style="background:var(--bg3);padding:2px 8px;border-radius:4px">/setup</code>, post a <code style="background:var(--bg3);padding:2px 8px;border-radius:4px">/panel</code> — done.</p>
+    <div class="cta">
+      <a class="btn" id="invite-btn-2" href="/auth/discord">➕ Add to Discord</a>
+      <a class="btn ghost" href="/dashboard">Dashboard →</a>
+    </div>
+  </div>
+
+  <footer>
+    <span>🎫 TicketBot — self-hosted multipurpose hub</span>
+    <span>TypeScript · discord.js v14 · SQLite</span>
+  </footer>
+
+  <script>
+    fetch('/api/public').then(r => r.json()).then((d) => {
+      if (!d.clientId) return;
+      const url = 'https://discord.com/oauth2/authorize?client_id=' + d.clientId +
+        '&scope=bot%20applications.commands&permissions=1099780071478';
+      for (const id of ['invite-btn', 'invite-btn-2']) {
+        const el = document.getElementById(id);
+        if (el) el.href = url;
+      }
+      if (d.hubGuildId) {
+        const sb = document.getElementById('support-btn');
+        if (sb) sb.style.display = 'inline-block';
+      }
+    }).catch(() => {});
+  </script>
+</body>
+</html>
