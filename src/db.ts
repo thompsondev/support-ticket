@@ -43,6 +43,7 @@ const TABLE_PK: Record<string, string[]> = {
   sessions: ['sid'],
   ticket_types: ['guild_id', 'type_id'],
   satellites: ['guild_id'],
+  user_profiles: ['user_id'],
 };
 
 /** Convert sqlite-flavoured SQL (? placeholders, INSERT OR REPLACE/IGNORE) to Postgres syntax. */
@@ -348,9 +349,16 @@ CREATE TABLE IF NOT EXISTS referrals (
   user_id TEXT NOT NULL,
   channel_id TEXT,
   message_id TEXT,
+  referred_by TEXT,
   ticket_id INTEGER,
   created_at INTEGER NOT NULL,
   converted_at INTEGER
+);
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id TEXT PRIMARY KEY,
+  hub_guild_id TEXT,
+  hub_invite TEXT,
+  updated_at INTEGER NOT NULL
 );
 CREATE TABLE IF NOT EXISTS watchlist (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -624,9 +632,16 @@ CREATE TABLE IF NOT EXISTS referrals (
   user_id TEXT NOT NULL,
   channel_id TEXT,
   message_id TEXT,
+  referred_by TEXT,
   ticket_id BIGINT,
   created_at BIGINT NOT NULL,
   converted_at BIGINT
+);
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id TEXT PRIMARY KEY,
+  hub_guild_id TEXT,
+  hub_invite TEXT,
+  updated_at BIGINT NOT NULL
 );
 CREATE TABLE IF NOT EXISTS watchlist (
   id BIGSERIAL PRIMARY KEY,
@@ -697,6 +712,12 @@ async function initSchema(): Promise<void> {
     for (const col of ['guild_id', 'invite_code']) {
       if (!wlCols.includes(col)) sqlite.exec(`ALTER TABLE watchlist ADD COLUMN ${col} TEXT`);
     }
+    const refCols = (sqlite.prepare('PRAGMA table_info(referrals)').all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+    if (!refCols.includes('referred_by')) {
+      sqlite.exec('ALTER TABLE referrals ADD COLUMN referred_by TEXT');
+    }
     return;
   }
   const p = pg!;
@@ -713,6 +734,7 @@ async function initSchema(): Promise<void> {
   for (const col of ['guild_id', 'invite_code']) {
     await p.query(`ALTER TABLE watchlist ADD COLUMN IF NOT EXISTS ${col} TEXT`);
   }
+  await p.query('ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referred_by TEXT');
 }
 
 let initPromise: Promise<void> | null = null;
@@ -1575,15 +1597,16 @@ export interface ReferralRow {
   user_id: string;
   channel_id: string | null;
   message_id: string | null;
+  referred_by: string | null;
   ticket_id: number | null;
   created_at: number;
   converted_at: number | null;
 }
 
-export async function addReferral(satGid: string, userId: string, channelId: string, messageId: string): Promise<number> {
+export async function addReferral(satGid: string, userId: string, channelId: string, messageId: string, referredBy?: string): Promise<number> {
   const res = await D.run(
-    'INSERT INTO referrals (satellite_guild_id, user_id, channel_id, message_id, created_at) VALUES (?, ?, ?, ?, ?)',
-    [satGid, userId, channelId, messageId, Date.now()],
+    'INSERT INTO referrals (satellite_guild_id, user_id, channel_id, message_id, referred_by, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    [satGid, userId, channelId, messageId, referredBy ?? null, Date.now()],
   );
   return res.lastId;
 }
@@ -1597,12 +1620,42 @@ export async function getOpenReferral(userId: string): Promise<ReferralRow | und
 
 export async function convertReferral(userId: string, hubGuildId: string): Promise<ReferralRow | undefined> {
   const ref = await D.get(
-    `SELECT r.* FROM referrals r JOIN satellites s ON s.guild_id = r.satellite_guild_id
-     WHERE r.user_id = ? AND s.hub_guild_id = ? AND r.converted_at IS NULL ORDER BY r.id DESC LIMIT 1`,
-    [userId, hubGuildId],
+    `SELECT r.* FROM referrals r
+     LEFT JOIN satellites s ON s.guild_id = r.satellite_guild_id
+     LEFT JOIN user_profiles up ON up.user_id = r.referred_by
+     WHERE r.user_id = ? AND r.converted_at IS NULL
+       AND (s.hub_guild_id = ? OR up.hub_guild_id = ?)
+     ORDER BY r.id DESC LIMIT 1`,
+    [userId, hubGuildId, hubGuildId],
   ) as ReferralRow | undefined;
   if (ref) await D.run('UPDATE referrals SET converted_at = ? WHERE id = ?', [Date.now(), ref.id]);
   return ref;
+}
+
+// ---------- per-user hub profiles ----------
+
+export interface UserProfile {
+  user_id: string;
+  hub_guild_id: string | null;
+  hub_invite: string | null;
+  updated_at: number;
+}
+
+export async function getUserProfile(userId: string): Promise<UserProfile | undefined> {
+  return await D.get('SELECT * FROM user_profiles WHERE user_id = ?', [userId]) as
+    | UserProfile
+    | undefined;
+}
+
+export async function setUserProfile(
+  userId: string,
+  hubGuildId: string | null,
+  hubInvite: string | null,
+): Promise<void> {
+  await D.run(
+    'INSERT OR REPLACE INTO user_profiles (user_id, hub_guild_id, hub_invite, updated_at) VALUES (?, ?, ?, ?)',
+    [userId, hubGuildId, hubInvite, Date.now()],
+  );
 }
 
 export async function linkReferralTicket(userId: string, ticketId: number): Promise<void> {

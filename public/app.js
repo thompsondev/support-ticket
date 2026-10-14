@@ -1263,9 +1263,9 @@ async function discover() {
     <div class="loading">Loading market data…</div>`;
   document.getElementById('back').onclick = renderGuilds;
 
-  let d;
+  let d, hub;
   try {
-    d = await api('/api/discover');
+    [d, hub] = await Promise.all([api('/api/discover'), api('/api/me/hub').catch(() => null)]);
   } catch {
     app.innerHTML += '<div class="card"><p class="muted">CoinGecko is rate-limited or unavailable — try again in a minute.</p></div>';
     return;
@@ -1292,6 +1292,16 @@ async function discover() {
 
   app.innerHTML = `<div class="page"><span class="back" id="back">← Servers</span>
     <h2>🔍 Coin discovery</h2>
+    <div class="card">
+      <h3>🎯 My support hub</h3>
+      <p class="muted">Where <b>Route to Support</b> (right-click any message → Apps) sends people — <b>your</b> server, not a global one. Pick a server you admin that has the bot installed, or paste an invite directly.</p>
+      <div class="inline-form">
+        <div style="flex:1"><select id="hub-guild"><option value="">— pick your hub server —</option>${(state.me.guilds ?? []).filter((g) => g.hasBot).map((g) => `<option value="${g.id}" ${hub?.hub_guild_id === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></div>
+        <div style="flex:2"><input id="hub-invite" placeholder="https://discord.gg/your-hub (auto-generated if empty)" value="${esc(hub?.hub_invite ?? '')}"></div>
+        <button class="btn" id="hub-save">Save</button>
+      </div>
+      <p class="muted" id="hub-status" style="margin-top:8px">${hub?.hub_invite ? `Active — routes to <b>${esc(hub.hub_name ?? 'your hub')}</b>: <a href="${esc(hub.hub_invite)}" target="_blank" style="color:var(--accent)">${esc(hub.hub_invite)}</a>` : `Not set${hub?.platform_default ? ' — falling back to the platform default invite' : ''}`}</p>
+    </div>
     <div class="card">
       <h3>➕ Add a coin server by invite</h3>
       <p class="muted">Paste a coin project's Discord invite. The bot previews the server (it doesn't join) — if you or their admins authorize it via the link below, satellite mode arms itself automatically.</p>
@@ -1363,6 +1373,28 @@ async function discover() {
   };
   renderWatchlist(d.watchlist);
   document.getElementById('back').onclick = renderGuilds;
+
+  document.getElementById('hub-save').onclick = async () => {
+    const b = document.getElementById('hub-save');
+    b.disabled = true;
+    try {
+      const r = await api('/api/me/hub', {
+        method: 'PUT',
+        body: JSON.stringify({
+          hub_guild_id: document.getElementById('hub-guild').value,
+          hub_invite: document.getElementById('hub-invite').value.trim(),
+        }),
+      });
+      document.getElementById('hub-invite').value = r.hub_invite ?? '';
+      document.getElementById('hub-status').innerHTML =
+        `Saved — <b>Route to Support</b> now routes to ${esc(r.hub_invite)}. Referral conversions are tracked${r.hub_guild_id ? '' : ' once you pick a hub server'}.`;
+      notice('Support hub saved.');
+    } catch (e) {
+      notice(e.message === 'bot_not_in_guild' ? 'Invite the bot to that server first.' : `Save failed: ${e.message}`, false);
+    } finally {
+      b.disabled = false;
+    }
+  };
 
   document.getElementById('srv-add').onclick = async () => {
     const el = document.getElementById('srv-result');

@@ -28,6 +28,7 @@ import {
   addTempVoice,
   clearAfk,
   convertReferral,
+  getUserProfile,
   dbRun,
   deleteReminder,
   findWatchByGuild,
@@ -214,14 +215,20 @@ client.on(Events.InteractionCreate, async (i) => {
     // user-installable context command — works even in servers where the bot
     // isn't installed. Right-click a member's message → Apps → Route to Support.
     if (i.isMessageContextMenuCommand() && i.commandName === 'Route to Support') {
-      if (!env.hubInvite) {
-        await i.reply({ content: 'The support hub invite is not configured (HUB_INVITE).', flags: MessageFlags.Ephemeral });
+      // the invoker's own hub wins; platform default (HUB_INVITE) is the fallback
+      const profile = await getUserProfile(i.user.id).catch(() => undefined);
+      const hubInvite = profile?.hub_invite || env.hubInvite;
+      if (!hubInvite) {
+        await i.reply({
+          content: 'Set your support hub first — dashboard → Coin discovery → **My support hub**.',
+          flags: MessageFlags.Ephemeral,
+        });
         return;
       }
       const target = i.targetMessage;
       const guildName = i.guild?.name ?? 'this community';
       const text = await satelliteReplyText(
-        { hub_invite: env.hubInvite, reply_text: null, ai_enabled: 1 },
+        { hub_invite: hubInvite, reply_text: null, ai_enabled: 1 },
         target.content || 'a support request',
         guildName,
       );
@@ -229,7 +236,9 @@ client.on(Events.InteractionCreate, async (i) => {
         embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription(text)],
       });
       if (i.guildId && !target.author.bot) {
-        await addReferral(i.guildId, target.author.id, i.channelId ?? '', target.id).catch(() => {});
+        await addReferral(i.guildId, target.author.id, i.channelId ?? '', target.id, i.user.id).catch(
+          () => {},
+        );
       }
       return;
     }

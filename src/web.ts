@@ -32,6 +32,7 @@ import {
   findWatchByGuild,
   getAuditLog,
   getSatellite,
+  getUserProfile,
   getWatch,
   logAudit,
   getTags,
@@ -62,6 +63,7 @@ import {
   setGiveawayMessage,
   setSatellite,
   setSticky,
+  setUserProfile,
   setTag,
   unbindReactionRole,
   updateSatellite,
@@ -376,6 +378,56 @@ export function startWeb(client: Client): void {
       csrf: req.session.csrf,
       accounts: (req.session.accounts ?? []).map(({ id, username, avatar }) => ({ id, username, avatar })),
     });
+  });
+
+  // ---------- per-user support hub ("Route to Support" destination) ----------
+
+  app.get('/api/me/hub', authed, async (req, res) => {
+    const p = await getUserProfile(req.session.user!.id);
+    const g = p?.hub_guild_id ? client.guilds.cache.get(p.hub_guild_id) : undefined;
+    res.json({
+      hub_guild_id: p?.hub_guild_id ?? null,
+      hub_invite: p?.hub_invite ?? null,
+      hub_name: g?.name ?? null,
+      platform_default: env.hubInvite || null,
+    });
+  });
+
+  app.put('/api/me/hub', authed, async (req, res) => {
+    const gid = (req.body?.hub_guild_id ?? '').trim() || null;
+    let invite = (req.body?.hub_invite ?? '').trim() || null;
+    if (invite && !/^https?:\/\/(www\.)?(discord\.gg|discord\.com\/invite)\/\S+$/i.test(invite)) {
+      return res.status(400).json({ error: 'invalid_invite' });
+    }
+    if (gid) {
+      if (!isOwnerReq(req) && !canManage(req, gid)) {
+        return res.status(403).json({ error: 'missing_manage_guild' });
+      }
+      if (!client.guilds.cache.has(gid)) {
+        return res.status(404).json({ error: 'bot_not_in_guild', hint: 'Invite the bot there first.' });
+      }
+      // auto-mint an invite when the user only picked a guild
+      if (!invite) {
+        const g = client.guilds.cache.get(gid)!;
+        const chan =
+          g.systemChannel ??
+          g.channels.cache.find(
+            (c) =>
+              c.type === ChannelType.GuildText &&
+              c.permissionsFor(g.members.me!)?.has(PermissionFlagsBits.CreateInstantInvite),
+          );
+        const inv = chan && 'createInvite' in chan
+          ? await chan.createInvite({ maxAge: 0, maxUses: 0, reason: 'user hub invite' }).catch(() => null)
+          : null;
+        if (!inv) {
+          return res.status(400).json({ error: 'no_invite_channel', hint: 'Paste an invite URL manually.' });
+        }
+        invite = inv.url;
+      }
+    }
+    if (!gid && !invite) return res.status(400).json({ error: 'nothing_to_save' });
+    await setUserProfile(req.session.user!.id, gid, invite);
+    res.json({ ok: true, hub_guild_id: gid, hub_invite: invite });
   });
 
   // switch the session's active Discord identity to a previously-authorized account
