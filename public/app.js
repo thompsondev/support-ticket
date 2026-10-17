@@ -326,6 +326,9 @@ function settings() {
   const chanOpts = (sel) =>
     `<option value="">— none —</option>` +
     r.textChannels.map((x) => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>#${esc(x.name)}</option>`).join('');
+  const catOpts = (sel) =>
+    `<option value="">— none —</option>` +
+    (r.categories ?? []).map((x) => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>📁 ${esc(x.name)}</option>`).join('');
 
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
@@ -335,6 +338,8 @@ function settings() {
         <div><label>Admin role</label><select id="f-admin">${roleOpts(c.admin_role_id)}</select></div>
         <div><label>Log channel</label><select id="f-log">${chanOpts(c.log_channel_id)}</select></div>
         <div><label>Transcript channel</label><select id="f-trans">${chanOpts(c.transcript_channel_id)}</select></div>
+        <div><label>Open-ticket category</label><select id="f-opencat">${catOpts(c.open_category_id)}</select></div>
+        <div><label>Closed-ticket category</label><select id="f-closedcat">${catOpts(c.closed_category_id)}</select></div>
       </div>
       <h3 style="margin-top:20px">Limits</h3>
       <div class="row">
@@ -374,6 +379,8 @@ function settings() {
       admin_role_id: document.getElementById('f-admin').value || null,
       log_channel_id: document.getElementById('f-log').value || null,
       transcript_channel_id: document.getElementById('f-trans').value || null,
+      open_category_id: document.getElementById('f-opencat').value || null,
+      closed_category_id: document.getElementById('f-closedcat').value || null,
       max_tickets: Number(document.getElementById('f-max').value),
       cooldown_seconds: Number(document.getElementById('f-cd').value),
       autoclose_hours: Number(document.getElementById('f-ac').value),
