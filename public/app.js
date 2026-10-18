@@ -1318,6 +1318,7 @@ async function discover() {
         <button class="btn" id="hub-save">Save</button>
       </div>
       <p class="muted" id="hub-status" style="margin-top:8px">${hub?.hub_invite ? `Active — routes to <b>${esc(hub.hub_name ?? 'your hub')}</b>: <a href="${esc(hub.hub_invite)}" target="_blank" style="color:var(--accent)">${esc(hub.hub_invite)}</a>` : `Not set${hub?.platform_default ? ' — falling back to the platform default invite' : ''}`}</p>
+      <p class="muted" style="margin-top:8px">👉 First time? <a href="https://discord.com/oauth2/authorize?client_id=${state.me.clientId}&integration_type=1&scope=applications.commands" target="_blank" style="color:var(--accent)"><b>Install the app to your Discord account</b></a> — one click, then right-click any member's message in any server → Apps → <b>Route to Support</b>.</p>
     </div>
     <div class="card">
       <h3>➕ Add a coin server by invite</h3>
