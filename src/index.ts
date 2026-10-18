@@ -29,6 +29,7 @@ import {
   clearAfk,
   convertReferral,
   getUserProfile,
+  getProfilesByHubGuild,
   dbRun,
   deleteReminder,
   findWatchByGuild,
@@ -130,6 +131,8 @@ client.once(Events.ClientReady, async (c) => {
   } catch (err) {
     console.error('Command registration failed:', err);
   }
+  // snapshot invite use-counts so joins can be attributed to staff invites
+  for (const g of client.guilds.cache.values()) void cacheGuildInvites(g);
   // maintenance sweep every 5 minutes: ticket inactivity + poll expiry
   setInterval(async () => {
     autoCloseSweep(client).catch(console.error);
@@ -503,6 +506,41 @@ client.on(Events.GuildMemberAdd, async (member) => {
         .setTimestamp(),
     ).catch(() => {});
   }
+  // staff-invite attribution — member joined via a staff member's hub invite
+  // (manual paste instead of Route to Support still gets credited)
+  try {
+    const profs = await getProfilesByHubGuild(member.guild.id);
+    if (profs.length) {
+      const before = inviteUses.get(member.guild.id) ?? new Map<string, number>();
+      const invs = await member.guild.invites.fetch().catch(() => null);
+      if (invs) {
+        const after = new Map(invs.map((i) => [i.code, i.uses ?? 0]));
+        inviteUses.set(member.guild.id, after);
+        const usedCode = [...after.entries()].find(
+          ([code, uses]) =>
+            uses > (before.get(code) ?? 0) && profs.some((p) => p.hub_invite?.includes(code)),
+        )?.[0];
+        if (usedCode) {
+          const prof = profs.find((p) => p.hub_invite?.includes(usedCode))!;
+          await addReferral(`invite:${usedCode}`, member.id, '', '', prof.user_id).catch(() => {});
+          await dbRun(
+            'UPDATE referrals SET converted_at = ? WHERE user_id = ? AND converted_at IS NULL',
+            [Date.now(), member.id],
+          ).catch(() => {});
+          logToGuild(
+            member.guild,
+            new EmbedBuilder()
+              .setTitle('📨 Staff invite join')
+              .setColor(COLORS.info)
+              .setDescription(`<@${member.id}> joined via <@${prof.user_id}>'s hub invite`)
+              .setTimestamp(),
+          ).catch(() => {});
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Staff invite attribution error:', err);
+  }
   if (cfg.autorole_id) {
     await member.roles.add(cfg.autorole_id).catch(() => {});
   }
@@ -526,12 +564,30 @@ client.on(Events.GuildMemberAdd, async (member) => {
   }
 });
 
+// ---------- invite-use tracking (staff attribution) ----------
+
+const inviteUses = new Map<string, Map<string, number>>();
+async function cacheGuildInvites(g: Guild): Promise<void> {
+  const invs = await g.invites.fetch().catch(() => null);
+  if (invs) inviteUses.set(g.id, new Map(invs.map((i) => [i.code, i.uses ?? 0])));
+}
+
+client.on(Events.InviteCreate, (inv) => {
+  const gid = inv.guild?.id;
+  if (gid) inviteUses.get(gid)?.set(inv.code, inv.uses ?? 0);
+});
+client.on(Events.InviteDelete, (inv) => {
+  const gid = inv.guild?.id;
+  if (gid) inviteUses.get(gid)?.delete(inv.code);
+});
+
 // ---------- satellite auto-arm on join ----------
 
 // When the bot is authorized into a guild that someone tracked via the
 // dashboard's "add coin server" flow, mark the watchlist entry joined and —
 // if this instance has a hub configured — arm satellite mode automatically.
 client.on(Events.GuildCreate, async (guild) => {
+  void cacheGuildInvites(guild);
   try {
     const w = await findWatchByGuild(guild.id);
     if (!w) return; // organic install — admin configures via /satellite or dashboard

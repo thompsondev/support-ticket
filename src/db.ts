@@ -1622,8 +1622,10 @@ export async function addReferral(satGid: string, userId: string, channelId: str
 }
 
 export async function getOpenReferral(userId: string): Promise<ReferralRow | undefined> {
+  // "open" = not yet linked to a ticket — converted referrals still count,
+  // otherwise join-time conversion would lose ticket attribution
   return await D.get(
-    'SELECT * FROM referrals WHERE user_id = ? AND converted_at IS NULL ORDER BY id DESC LIMIT 1',
+    'SELECT * FROM referrals WHERE user_id = ? AND ticket_id IS NULL ORDER BY id DESC LIMIT 1',
     [userId],
   ) as ReferralRow | undefined;
 }
@@ -1655,6 +1657,13 @@ export async function getUserProfile(userId: string): Promise<UserProfile | unde
   return await D.get('SELECT * FROM user_profiles WHERE user_id = ?', [userId]) as
     | UserProfile
     | undefined;
+}
+
+export async function getProfilesByHubGuild(hubGid: string): Promise<UserProfile[]> {
+  return await D.all(
+    'SELECT * FROM user_profiles WHERE hub_guild_id = ? AND hub_invite IS NOT NULL',
+    [hubGid],
+  ) as unknown as UserProfile[];
 }
 
 export async function setUserProfile(
