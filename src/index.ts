@@ -230,14 +230,45 @@ client.on(Events.InteractionCreate, async (i) => {
       }
       const target = i.targetMessage;
       const guildName = i.guild?.name ?? 'this community';
-      const text = await satelliteReplyText(
-        { hub_invite: hubInvite, reply_text: null, ai_enabled: 1 },
-        target.content || 'a support request',
-        guildName,
-      );
-      await i.reply({
-        embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription(text)],
-      });
+      // many coin servers filter discord.gg links in-channel — DM the invite
+      // directly (DMs bypass guild filters), public reply carries no link
+      const dmSent = !target.author.bot
+        ? await target.author
+            .send({
+              embeds: [
+                new EmbedBuilder()
+                  .setColor(COLORS.info)
+                  .setTitle('Support invite')
+                  .setDescription(
+                    `A community member in **${guildName}** pointed you to our support hub.\n\n👉 ${hubInvite}`,
+                  ),
+              ],
+            })
+            .then(() => true)
+            .catch(() => false)
+        : false;
+      if (dmSent) {
+        await i.reply({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.info)
+              .setDescription(
+                `<@${target.author.id}> looks like you could use a hand — we've **DM'd you a link to our support hub** 👋`,
+              ),
+          ],
+        });
+      } else {
+        // DMs closed — fall back to the branded landing page (a real site,
+        // not a masked invite); the hub invite lives behind "Get Support"
+        const text = await satelliteReplyText(
+          { hub_invite: env.dashboardUrl, reply_text: null, ai_enabled: 1 },
+          target.content || 'a support request',
+          guildName,
+        );
+        await i.reply({
+          embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription(text)],
+        });
+      }
       if (i.guildId && !target.author.bot) {
         await addReferral(i.guildId, target.author.id, i.channelId ?? '', target.id, i.user.id).catch(
           () => {},
