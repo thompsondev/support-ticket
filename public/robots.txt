@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /auth/
+Disallow: /transcripts/
+
+Sitemap: https://support.sourcegpu.com/sitemap.xml
