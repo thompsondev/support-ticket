@@ -1226,17 +1226,18 @@ async function satellite() {
       </table>
       <h3 style="margin-top:14px">Incoming referrals (${hub.referrals.length})</h3>
       <table>
-        <tr><th>User</th><th>From server</th><th>When</th><th>Ticket</th></tr>
+        <tr><th>User</th><th>From server</th><th>Referred by</th><th>When</th><th>Ticket</th></tr>
         ${hub.referrals
           .map(
             (r) => `<tr>
             <td><code>${r.user_id}</code></td>
             <td><code>${r.satellite_guild_id}</code></td>
+            <td>${r.referred_by ? `<@${r.referred_by}> <code class="muted">${r.referred_by}</code>` : '<span class="muted">auto-responder</span>'}</td>
             <td>${new Date(r.created_at).toLocaleString()}</td>
             <td>${r.ticket_id ? `#${r.ticket_id}` : '<span class="muted">—</span>'}</td>
           </tr>`,
           )
-          .join('') || '<tr><td colspan="4" class="muted">No incoming referrals yet.</td></tr>'}
+          .join('') || '<tr><td colspan="5" class="muted">No incoming referrals yet.</td></tr>'}
       </table>
     </div>`;
 
@@ -1312,7 +1313,7 @@ async function discover() {
       <h3>🎯 My support hub</h3>
       <p class="muted">Where <b>Route to Support</b> (right-click any message → Apps) sends people — <b>your</b> server, not a global one. Pick a server you admin that has the bot installed, or paste an invite directly.</p>
       <div class="inline-form">
-        <div style="flex:1"><select id="hub-guild"><option value="">— pick your hub server —</option>${(state.me.guilds ?? []).filter((g) => g.hasBot).map((g) => `<option value="${g.id}" ${hub?.hub_guild_id === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></div>
+        <div style="flex:1"><select id="hub-guild"><option value="">— pick your hub server —</option>${(state.me.hubGuilds ?? state.me.guilds?.filter((g) => g.hasBot) ?? []).map((g) => `<option value="${g.id}" ${hub?.hub_guild_id === g.id ? 'selected' : ''}>${esc(g.name)}</option>`).join('')}</select></div>
         <div style="flex:2"><input id="hub-invite" placeholder="https://discord.gg/your-hub (auto-generated if empty)" value="${esc(hub?.hub_invite ?? '')}"></div>
         <button class="btn" id="hub-save">Save</button>
       </div>

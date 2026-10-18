@@ -139,9 +139,12 @@ export async function createTicket(
   if (ref) {
     await linkReferralTicket(user.id, ticket.id);
     const fromName = guild.client.guilds.cache.get(ref.satellite_guild_id)?.name ?? ref.satellite_guild_id;
-    await addNote(ticket.id, guild.client.user?.id ?? 'system', `📨 Referred from satellite server **${fromName}**`).catch(
-      () => {},
-    );
+    await addNote(
+      ticket.id,
+      guild.client.user?.id ?? 'system',
+      `📨 Referred from satellite server **${fromName}**` +
+        (ref.referred_by ? ` — referred by <@${ref.referred_by}>` : ''),
+    ).catch(() => {});
   }
 
   const ping = cfg.support_role_id ? `<@&${cfg.support_role_id}>` : '';

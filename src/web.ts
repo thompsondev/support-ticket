@@ -373,6 +373,12 @@ export function startWeb(client: Client): void {
     res.json({
       user: req.session.user,
       guilds,
+      // every bot-installed guild the user is a MEMBER of (manage not required)
+      // — used for the personal "My support hub" picker so support staff can
+      // route referrals without holding Manage Server
+      hubGuilds: (req.session.guilds ?? [])
+        .filter((g) => client.guilds.cache.has(g.id))
+        .map((g) => ({ id: g.id, name: g.name, icon: g.icon })),
       clientId: env.clientId,
       isOwner: owner,
       csrf: req.session.csrf,
@@ -400,8 +406,10 @@ export function startWeb(client: Client): void {
       return res.status(400).json({ error: 'invalid_invite' });
     }
     if (gid) {
-      if (!isOwnerReq(req) && !canManage(req, gid)) {
-        return res.status(403).json({ error: 'missing_manage_guild' });
+      // any member of a bot-installed guild may point their personal hub at
+      // it — referral attribution doesn't grant them any control over it
+      if (!isOwnerReq(req) && !req.session.guilds?.some((g) => g.id === gid)) {
+        return res.status(403).json({ error: 'not_a_member' });
       }
       if (!client.guilds.cache.has(gid)) {
         return res.status(404).json({ error: 'bot_not_in_guild', hint: 'Invite the bot there first.' });

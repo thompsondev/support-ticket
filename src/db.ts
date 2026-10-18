@@ -1684,9 +1684,12 @@ export async function referralsForGuild(satGid: string, limit = 50): Promise<Ref
 
 export async function referralsForHub(hubGid: string, limit = 50): Promise<ReferralRow[]> {
   return await D.all(
-    `SELECT r.* FROM referrals r JOIN satellites s ON s.guild_id = r.satellite_guild_id
-     WHERE s.hub_guild_id = ? ORDER BY r.id DESC LIMIT ?`,
-    [hubGid, limit],
+    `SELECT r.* FROM referrals r
+     LEFT JOIN satellites s ON s.guild_id = r.satellite_guild_id
+     LEFT JOIN user_profiles up ON up.user_id = r.referred_by
+     WHERE s.hub_guild_id = ? OR up.hub_guild_id = ?
+     ORDER BY r.id DESC LIMIT ?`,
+    [hubGid, hubGid, limit],
   ) as unknown as ReferralRow[];
 }
 

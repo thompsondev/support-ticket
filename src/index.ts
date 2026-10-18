@@ -497,7 +497,8 @@ client.on(Events.GuildMemberAdd, async (member) => {
         .setColor(COLORS.info)
         .setDescription(
           `<@${member.id}> was routed here from **${fromName}**` +
-            (sat ? ` (satellite ${sat.hub_invite})` : ''),
+            (sat ? ` (satellite ${sat.hub_invite})` : '') +
+            (ref.referred_by ? `\nReferred by <@${ref.referred_by}>` : ''),
         )
         .setTimestamp(),
     ).catch(() => {});
