@@ -472,13 +472,27 @@ function types() {
       notice('Type removed.');
     };
   });
+  const idEl = document.getElementById('n-id');
+  const labelEl = document.getElementById('n-label');
+  const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
+  labelEl.oninput = () => {
+    if (!idEl.dataset.touched) idEl.value = slug(labelEl.value);
+  };
+  idEl.oninput = () => {
+    idEl.dataset.touched = '1';
+    idEl.value = slug(idEl.value);
+  };
+
   document.getElementById('n-add').onclick = async () => {
     try {
+      const id = idEl.value.trim();
+      if (!/^[a-z0-9-]{1,32}$/.test(id)) return notice('ID must be lowercase a-z, 0-9, dashes only.', false);
+      if (ts.some((t) => t.type_id === id)) return notice(`"${id}" already exists — use a different ID.`, false);
       await api(`/api/guilds/${state.guild.id}/types`, {
         method: 'POST',
         body: JSON.stringify({
-          id: document.getElementById('n-id').value.trim(),
-          label: document.getElementById('n-label').value.trim(),
+          id,
+          label: labelEl.value.trim(),
           emoji: document.getElementById('n-emoji').value.trim() || null,
           description: document.getElementById('n-desc').value.trim() || null,
           category_id: document.getElementById('n-cat').value || null,
@@ -488,7 +502,7 @@ function types() {
       await reloadOverview('types');
       notice('Type added.');
     } catch (e) {
-      notice(e.message, false);
+      notice(e.message === 'max_types' ? 'Discord allows max 25 types per panel — remove one first.' : e.message, false);
     }
   };
 }
