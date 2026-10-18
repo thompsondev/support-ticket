@@ -5,8 +5,19 @@ import {
   EmbedBuilder,
   MessageCreateOptions,
 } from 'discord.js';
+import { createHmac } from 'node:crypto';
 import { getLinks } from './db';
+import { env } from './env';
 import { COLORS } from './util';
+
+// Signed token for tracked link redirects — proves the click URL was minted
+// by us for that user, so clicks can't be forged with arbitrary user ids.
+export function linkSig(guildId: string, linkId: number, userId: string): string {
+  return createHmac('sha256', env.sessionSecret || env.token)
+    .update(`${guildId}:${linkId}:${userId}`)
+    .digest('hex')
+    .slice(0, 16);
+}
 
 // Professional links panel: descriptions live in the embed, each link is a
 // Link-style button — users click the label, the URL is never shown in chat.

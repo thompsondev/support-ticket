@@ -1011,6 +1011,12 @@ export async function getLinks(guildId: string): Promise<LinkRow[]> {
   return await D.all('SELECT * FROM links WHERE guild_id = ? ORDER BY label', [guildId]) as unknown as LinkRow[];
 }
 
+export async function getLinkById(guildId: string, id: number): Promise<LinkRow | undefined> {
+  return await D.get('SELECT * FROM links WHERE guild_id = ? AND id = ?', [guildId, id]) as
+    | LinkRow
+    | undefined;
+}
+
 export async function addLink(guildId: string, label: string, url: string, description: string | null, emoji?: string | null): Promise<boolean> {
   const res = await D.run('INSERT OR IGNORE INTO links (guild_id, label, url, description, emoji) VALUES (?, ?, ?, ?, ?)', [guildId, label, url, description, emoji ?? null]);
   return Number(res.changes) > 0;

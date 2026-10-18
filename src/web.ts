@@ -6,7 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ChannelType, Client, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { env } from './env';
-import { linksMessage } from './links';
+import { linksMessage, linkSig } from './links';
 import {
   addFormField,
   addLink,
@@ -25,6 +25,7 @@ import {
   getConfig,
   getFormFields,
   getGiveaway,
+  getLinkById,
   getLinks,
   getSticky,
   getSuggestions,
@@ -245,6 +246,35 @@ export function startWeb(client: Client): void {
   app.get('/api/public', async (_req: Request, res) =>
     res.json({ clientId: env.clientId, hubGuildId: env.hubGuildId || null }),
   );
+
+  // tracked redirect for self-service issue links — notifies the guild's log
+  // channel that the link was clicked, then redirects to the real URL.
+  app.get('/go/:gid/:linkId', async (req: Request, res) => {
+    const gid = String(req.params.gid);
+    const link = await getLinkById(gid, Number(req.params.linkId));
+    if (!link) return res.status(404).send('This link is no longer available.');
+    const u = String(req.query.u ?? '');
+    const verified = String(req.query.s ?? '') === linkSig(gid, link.id, u);
+    const cfg = await getConfig(gid);
+    if (cfg.log_channel_id) {
+      const ch = await client.channels.fetch(cfg.log_channel_id).catch(() => null);
+      if (ch?.isTextBased() && 'send' in ch) {
+        const user = verified && u ? await client.users.fetch(u).catch(() => null) : null;
+        await ch.send({
+          embeds: [
+            new EmbedBuilder()
+              .setColor(COLORS.info)
+              .setTitle('🔗 Self-service link clicked')
+              .setDescription(
+                `${user ? `<@${user.id}> (**${user.tag}**)` : 'Someone'} clicked the resolution link for **${link.label}**.`,
+              )
+              .setTimestamp(),
+          ],
+        }).catch(() => {});
+      }
+    }
+    res.redirect(link.url);
+  });
 
   const redirectUri = `${env.dashboardUrl}/auth/callback`;
 

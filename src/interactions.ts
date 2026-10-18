@@ -1,6 +1,8 @@
 import {
   ActionRowBuilder,
+  ButtonBuilder,
   ButtonInteraction,
+  ButtonStyle,
   GuildMember,
   Interaction,
   MessageFlags,
@@ -11,12 +13,15 @@ import {
 } from 'discord.js';
 import {
   getFormFields,
+  getLinkById,
   getTicketByChannel,
   getTicketById,
   getTicketType,
   updateTicket,
   upsertRating,
 } from './db';
+import { env } from './env';
+import { linkSig } from './links';
 import { COLORS, confirmRow, ephemeral, isStaff, ticketEmbed, controlButtons, pad } from './util';
 import { closeTicket, createTicket, deleteTicket, logToGuild, reopenTicket } from './tickets';
 import { handlePollVote, handleSuggestionVote } from './votes';
@@ -92,6 +97,33 @@ export async function onInteraction(i: Interaction): Promise<void> {
     // ---- select menus ----
     if (i.isStringSelectMenu() && i.customId === 'panel:select') {
       await openOrModal(i, i.values[0]);
+      return;
+    }
+
+    // /issues picker — ephemeral self-service card with a tracked link button
+    if (i.isStringSelectMenu() && i.customId === 'issues:pick' && i.guildId) {
+      const link = await getLinkById(i.guildId, Number(i.values[0]));
+      if (!link) {
+        await i.reply(ephemeral('That issue link is no longer available — please ask staff.'));
+        return;
+      }
+      const url = `${env.dashboardUrl}/go/${i.guildId}/${link.id}?u=${i.user.id}&s=${linkSig(i.guildId, link.id, i.user.id)}`;
+      const embed = new EmbedBuilder()
+        .setTitle(`${link.emoji ? `${link.emoji} ` : ''}${link.label}`)
+        .setColor(COLORS.open)
+        .setDescription(
+          `${link.description ? `${link.description}\n\n` : ''}` +
+            'This is a **self-service** resolution — click the button below to resolve your issue.',
+        );
+      await i.reply({
+        embeds: [embed],
+        components: [
+          new ActionRowBuilder<ButtonBuilder>().addComponents(
+            new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel('Resolve this issue').setEmoji('🔧'),
+          ),
+        ],
+        flags: MessageFlags.Ephemeral,
+      });
       return;
     }
 

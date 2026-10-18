@@ -27,6 +27,7 @@ import { cmd } from './cmd';
 import { form } from './form';
 import { help } from './help';
 import { satellite } from './satellite';
+import { issues } from './issues';
 
 export interface Command {
   data:
@@ -39,7 +40,7 @@ export interface Command {
 const all: Command[] = [
   setup, panel, ticket, types, link, blacklist, stats, tag, suggest, poll,
   mod, announce, giveaway, remind, automod, reactionrole, sticky, afk,
-  userinfo, serverinfo, cmd, form, help, satellite,
+  userinfo, serverinfo, cmd, form, help, satellite, issues,
 ];
 
 export const commands = new Map<string, Command>(all.map((c) => [c.data.name, c]));
