@@ -578,6 +578,31 @@ function types() {
 function links() {
   const ls = state.overview.links;
   const EMOJIS = ['🔗','🎫','📖','🛡️','💰','🌐','📊','❓','🛠️','📈','🪙','🎁','✅','🆘','📚','💬','⚙️','🧭'];
+  const CRYPTO_ISSUE_LIST = [
+    'Migration Issues | Click here for migration-related issues',
+    'Validate Wallet | Click here for wallet validation issues',
+    'Assets/Token Recovery | Click here for assets recovery issues',
+    'Rectification | Click here to rectify issues',
+    'High Gas Fees | Click here gas fee-related issues',
+    'Claim Reward | Click here for reward-related issues',
+    'Deposits & Withdrawals | Click here for withdrawal-related issues',
+    'Slippage Error | Click here for slippage related error during trade',
+    'Transaction Error | Click here for transaction-related issues',
+    'Cross Chain Transfer | Click here for cross-chain bridge issues',
+    'Staking Issues | Click here staking related issues',
+    'Swap/Exchange | Click here for swap/exchange issues',
+    'Connect to Dapps | Click here for error while connecting to Dapps',
+    'Login Issues | Click here for issues while logging into your wallet',
+    'Claim Airdrop | Click here for airdrop-related issues',
+    'NFTS Issues | Click here for NFTs minting/transfer-related issues',
+    'Missing/Irregular Balance | Click here to recover lost/missing funds',
+    'Whitelist Issues | Click here for whitelist-related issues',
+    'Transaction Delay | Click here for any issues related to delayed',
+    'Locked/ Blacklisted Account | Click here for issues related to account lock',
+    'Trading Wallet Issues | Click here if you have a problem with your trading account',
+    'Unable to Buy Coin/Token | Click here to trade crypto, your account must be marked as trusted',
+    'Other Issues not Listed | If you can\'t find the issue you are experiencing, click here',
+  ];
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Links</h3>
@@ -608,8 +633,9 @@ function links() {
         <div style="flex:2"><label>Shared URL</label><input id="nl-bulk-url" placeholder="https://discord.gg/your-hub or your site"></div>
         <div><label>Emoji for all</label><input id="nl-bulk-emoji" placeholder="🔗" style="width:60px"></div>
       </div>
-      <textarea id="nl-bulk" rows="6" placeholder="Migration Issues | migration-related issues&#10;Validate Wallet | wallet validation issues&#10;Claim Reward | reward-related issues" style="width:100%;margin-top:8px"></textarea>
+      <textarea id="nl-bulk" rows="8" placeholder="Migration Issues | migration-related issues&#10;Validate Wallet | wallet validation issues&#10;Claim Reward | reward-related issues" style="width:100%;margin-top:8px"></textarea>
       <button class="btn" id="nl-bulk-add" style="margin-top:8px">Add all →</button>
+      <button class="btn secondary" id="nl-bulk-preset" style="margin-top:8px">📋 Load crypto issue list</button>
       <h3 style="margin-top:16px">Post to channel</h3>
       <div class="inline-form">
         <div style="flex:2"><select id="nl-channel"><option value="">— pick a channel —</option>${(state.resources?.textChannels ?? []).map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join('')}</select></div>
@@ -629,6 +655,10 @@ function links() {
   });
   document.getElementById('nl-emojipick').onchange = (e) => {
     if (e.target.value) document.getElementById('nl-emoji').value = e.target.value;
+  };
+  document.getElementById('nl-bulk-preset').onclick = () => {
+    document.getElementById('nl-bulk').value = CRYPTO_ISSUE_LIST.join('\n');
+    notice('Crypto issue list loaded — set your shared URL above, then Add all.');
   };
   document.getElementById('nl-bulk-add').onclick = async () => {
     const url = document.getElementById('nl-bulk-url').value.trim();
