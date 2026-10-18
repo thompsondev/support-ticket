@@ -417,6 +417,9 @@ function types() {
     [['secondary', '⬜ Gray (default)'], ['primary', '🟦 Blurple'], ['success', '🟩 Green'], ['danger', '🟥 Red']]
       .map(([v, l]) => `<option value="${v}" ${v === (sel ?? 'secondary') ? 'selected' : ''}>${l}</option>`)
       .join('');
+  const EMOJIS = ['🎫','💰','⚠️','🔒','🐛','💬','❓','🛠️','📦','🔄','💎','🎁','📈','🧾','🔗','🆘','✅','❌','🪙','🌉','⛽','🎯','📤','📥'];
+  const emojiPick = (cls) =>
+    `<select class="${cls}" style="width:70px"><option value="">😀</option>${EMOJIS.map((e) => `<option value="${e}">${e}</option>`).join('')}</select>`;
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Ticket types</h3>
@@ -428,7 +431,7 @@ function types() {
             (t) => `<tr data-id="${esc(t.type_id)}">
             <td>${esc(t.emoji ?? '')}</td><td><code>${esc(t.type_id)}</code></td>
             <td><input class="t-label" value="${esc(t.label)}"></td>
-            <td><input class="t-emoji" value="${esc(t.emoji ?? '')}" style="width:70px"></td>
+            <td style="white-space:nowrap"><input class="t-emoji" value="${esc(t.emoji ?? '')}" style="width:60px"> ${emojiPick('t-emojipick')}</td>
             <td><input class="t-desc" value="${esc(t.description ?? '')}"></td>
             <td><select class="t-cat">${catOpts(t.category_id)}</select></td>
             <td><select class="t-instant"><option value="1" ${t.instant ? 'selected' : ''}>⚡ Instant</option><option value="0" ${t.instant ? '' : 'selected'}>📝 Ask first</option></select></td>
@@ -442,7 +445,7 @@ function types() {
       <div class="inline-form">
         <div><label>ID (a-z 0-9 -)</label><input id="n-id" placeholder="vip"></div>
         <div><label>Label</label><input id="n-label" placeholder="VIP Support"></div>
-        <div><label>Emoji</label><input id="n-emoji" placeholder="💎"></div>
+        <div><label>Emoji</label><input id="n-emoji" placeholder="💎" style="width:60px"> ${emojiPick('n-emojipick')}</div>
         <div><label>Description</label><input id="n-desc" placeholder="Priority help"></div>
         <div><label>Category</label><select id="n-cat">${catOpts(null)}</select></div>
         <div><label>Opens</label><select id="n-instant"><option value="1">⚡ Instant</option><option value="0">📝 Ask first</option></select></div>
@@ -479,6 +482,16 @@ function types() {
       notice('Type removed.');
     };
   });
+  document.querySelectorAll('.t-emojipick').forEach((s) => {
+    s.onchange = () => {
+      const inp = s.closest('td').querySelector('.t-emoji');
+      if (s.value) inp.value = s.value;
+    };
+  });
+  document.getElementById('n-emojipick').onchange = (e) => {
+    if (e.target.value) document.getElementById('n-emoji').value = e.target.value;
+  };
+
   const idEl = document.getElementById('n-id');
   const labelEl = document.getElementById('n-label');
   const slug = (s) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32);
