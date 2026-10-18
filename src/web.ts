@@ -587,30 +587,45 @@ export function startWeb(client: Client): void {
 
   const TYPE_ID_RE = /^[a-z0-9-]{1,32}$/;
 
+  const validCategory = async (gid: string, v: unknown): Promise<string | null | 'invalid'> => {
+    if (v === null || v === '') return null;
+    if (typeof v !== 'string' || !/^\d{17,20}$/.test(v)) return 'invalid';
+    const ch = await client.guilds.cache.get(gid)?.channels.fetch(v).catch(() => null);
+    return ch?.type === ChannelType.GuildCategory ? v : 'invalid';
+  };
+
   app.post('/api/guilds/:gid/types', authed, guildAccess, async (req, res) => {
     const gid = req.params.gid as string;
-    const { id, label, emoji, description } = req.body ?? {};
+    const { id, label, emoji, description, category_id } = req.body ?? {};
     if (!TYPE_ID_RE.test(String(id)) || typeof label !== 'string' || !label.trim()) {
       return res.status(400).json({ error: 'invalid_type' });
     }
     if ((await getTicketTypes(gid)).length >= 25) return res.status(400).json({ error: 'max_types' });
+    const cat = category_id === undefined ? null : await validCategory(gid, category_id);
+    if (cat === 'invalid') return res.status(400).json({ error: 'invalid_category' });
     const ok = await addTicketType(gid, {
       type_id: id,
       label: label.slice(0, 100),
       emoji: typeof emoji === 'string' ? emoji.slice(0, 64) : null,
       description: typeof description === 'string' ? description.slice(0, 100) : null,
+      category_id: cat,
     });
     if (ok) await logAudit(req.session.user!.id, 'type_add', req.params.gid as string, String(id));
     res.status(ok ? 200 : 409).json({ ok, error: ok ? undefined : 'exists' });
   });
 
   app.patch('/api/guilds/:gid/types/:typeId', authed, guildAccess, async (req, res) => {
-    const { label, emoji, description } = req.body ?? {};
+    const { label, emoji, description, category_id } = req.body ?? {};
     const patch: Record<string, string | null> = {};
     if (typeof label === 'string') patch.label = label.slice(0, 100);
     if (typeof emoji === 'string' || emoji === null) patch.emoji = emoji?.slice(0, 64) ?? null;
     if (typeof description === 'string' || description === null) {
       patch.description = description?.slice(0, 100) ?? null;
+    }
+    if (category_id !== undefined) {
+      const cat = await validCategory(req.params.gid as string, category_id);
+      if (cat === 'invalid') return res.status(400).json({ error: 'invalid_category' });
+      patch.category_id = cat;
     }
     res.json({ ok: await updateTicketType(req.params.gid as string, req.params.typeId as string, patch) });
   });

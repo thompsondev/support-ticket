@@ -107,7 +107,7 @@ export async function createTicket(
   const channel = await guild.channels.create({
     name: `ticket-${pad(number)}`,
     type: ChannelType.GuildText,
-    parent: cfg.open_category_id ?? undefined,
+    parent: type?.category_id ?? cfg.open_category_id ?? undefined,
     topic: `Ticket #${pad(number)} | ${type?.label ?? typeId} | Owner: ${user.id}`,
     permissionOverwrites: overwrites,
   });
@@ -270,7 +270,9 @@ export async function reopenTicket(client: Client, ticket: Ticket): Promise<void
     .edit(ticket.owner_id, { ViewChannel: true, SendMessages: true })
     .catch(() => {});
   await channel.setName(`ticket-${pad(ticket.number)}`).catch(() => {});
-  if (cfg.open_category_id) await channel.setParent(cfg.open_category_id).catch(() => {});
+  const reopenParent =
+    (await getTicketType(ticket.guild_id, ticket.type))?.category_id ?? cfg.open_category_id;
+  if (reopenParent) await channel.setParent(reopenParent).catch(() => {});
 
   await refreshControlMessage(channel, updated);
   await channel.send({ embeds: [new EmbedBuilder().setDescription('♻️ Ticket reopened.').setColor(COLORS.open)] });
