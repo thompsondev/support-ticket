@@ -28,7 +28,7 @@ export async function linksMessage(guildId: string, _guildName: string): Promise
     .setColor(COLORS.info)
     .setDescription(
       links.length
-        ? "Choose the issue that best matches yours below — you'll get a **self-service** resolution link instantly, no need to wait for staff."
+        ? "Choose the issue that best matches yours below — you'll get a **self-service** resolution instantly, no need to wait for staff."
         : 'No links configured yet. Staff can add them with `/link add` or the dashboard Links tab.',
     );
   if (!links.length) return { embeds: [embed] };
