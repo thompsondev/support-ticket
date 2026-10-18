@@ -602,6 +602,14 @@ function links() {
         <div><label>Description</label><input id="nl-desc" placeholder="optional"></div>
         <button class="btn" id="nl-add">Add</button>
       </div>
+      <h3 style="margin-top:16px">Quick list — one link, many buttons</h3>
+      <p class="muted">One shared URL for every entry. One per line: <code>Label | optional description</code></p>
+      <div class="inline-form">
+        <div style="flex:2"><label>Shared URL</label><input id="nl-bulk-url" placeholder="https://discord.gg/your-hub or your site"></div>
+        <div><label>Emoji for all</label><input id="nl-bulk-emoji" placeholder="🔗" style="width:60px"></div>
+      </div>
+      <textarea id="nl-bulk" rows="6" placeholder="Migration Issues | migration-related issues&#10;Validate Wallet | wallet validation issues&#10;Claim Reward | reward-related issues" style="width:100%;margin-top:8px"></textarea>
+      <button class="btn" id="nl-bulk-add" style="margin-top:8px">Add all →</button>
       <h3 style="margin-top:16px">Post to channel</h3>
       <div class="inline-form">
         <div style="flex:2"><select id="nl-channel"><option value="">— pick a channel —</option>${(state.resources?.textChannels ?? []).map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join('')}</select></div>
@@ -621,6 +629,30 @@ function links() {
   });
   document.getElementById('nl-emojipick').onchange = (e) => {
     if (e.target.value) document.getElementById('nl-emoji').value = e.target.value;
+  };
+  document.getElementById('nl-bulk-add').onclick = async () => {
+    const url = document.getElementById('nl-bulk-url').value.trim();
+    if (!url) return notice('Set the shared URL first.', false);
+    const items = document.getElementById('nl-bulk').value
+      .split('\n')
+      .map((l) => l.trim())
+      .filter(Boolean)
+      .map((l) => {
+        const [label, ...rest] = l.split('|');
+        return { label: label.trim(), description: rest.join('|').trim() || undefined };
+      });
+    if (!items.length) return notice('Paste at least one label line.', false);
+    try {
+      const r = await api(`/api/guilds/${state.guild.id}/links/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({ url, emoji: document.getElementById('nl-bulk-emoji').value.trim() || null, items }),
+      });
+      document.getElementById('nl-bulk').value = '';
+      await reloadOverview('links');
+      notice(`Added ${r.added} link(s)${r.skipped ? ` — skipped ${r.skipped}` : ''}.`);
+    } catch (e) {
+      notice(e.message, false);
+    }
   };
   document.getElementById('nl-post').onclick = async () => {
     const cid = document.getElementById('nl-channel').value;

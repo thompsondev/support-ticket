@@ -756,6 +756,44 @@ export function startWeb(client: Client): void {
     res.status(ok ? 200 : 409).json({ ok });
   });
 
+  // bulk add — one shared URL + a list of labels creates many link buttons
+  app.post('/api/guilds/:gid/links/bulk', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const { url, emoji, items } = req.body ?? {};
+    let parsed: URL;
+    try {
+      parsed = new URL(String(url));
+    } catch {
+      return res.status(400).json({ error: 'invalid_url' });
+    }
+    if (!['http:', 'https:'].includes(parsed.protocol)) {
+      return res.status(400).json({ error: 'invalid_link' });
+    }
+    if (!Array.isArray(items)) return res.status(400).json({ error: 'no_items' });
+    const existing = await getLinks(gid);
+    const names = new Set(existing.map((l) => l.label.toLowerCase()));
+    let added = 0;
+    let skipped = 0;
+    for (const t of items.slice(0, 50)) {
+      const lbl = typeof t.label === 'string' ? t.label.trim() : '';
+      if (!lbl || names.has(lbl.toLowerCase()) || existing.length + added >= 25) {
+        skipped++;
+        continue;
+      }
+      const ok = await addLink(
+        gid,
+        lbl.slice(0, 80),
+        url,
+        typeof t.description === 'string' ? t.description.slice(0, 200) : null,
+        typeof t.emoji === 'string' ? t.emoji.slice(0, 64) : (typeof emoji === 'string' ? emoji.slice(0, 64) : null),
+      );
+      ok ? added++ : skipped++;
+      names.add(lbl.toLowerCase());
+    }
+    if (added) await logAudit(req.session.user!.id, 'links_bulk_add', gid, `${added} links`);
+    res.json({ ok: true, added, skipped });
+  });
+
   // post the links panel (button links) into a channel
   app.post('/api/guilds/:gid/links/panel', authed, guildAccess, async (req, res) => {
     const gid = req.params.gid as string;
