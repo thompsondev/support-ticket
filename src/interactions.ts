@@ -116,13 +116,13 @@ export async function onInteraction(i: Interaction): Promise<void> {
             'This is a **self-service** resolution — click the button below to resolve your issue.',
         );
       await i.reply({
+        content: `Self-service for <@${i.user.id}>:`,
         embeds: [embed],
         components: [
           new ActionRowBuilder<ButtonBuilder>().addComponents(
             new ButtonBuilder().setStyle(ButtonStyle.Link).setURL(url).setLabel('Resolve this issue').setEmoji('🔧'),
           ),
         ],
-        flags: MessageFlags.Ephemeral,
       });
       return;
     }
