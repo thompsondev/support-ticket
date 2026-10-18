@@ -577,16 +577,17 @@ function types() {
 
 function links() {
   const ls = state.overview.links;
+  const EMOJIS = ['🔗','🎫','📖','🛡️','💰','🌐','📊','❓','🛠️','📈','🪙','🎁','✅','🆘','📚','💬','⚙️','🧭'];
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Links</h3>
-      <p class="muted">Posted by /link show in Discord.</p>
+      <p class="muted">Posted by <code>/link show</code> or via <b>Post to channel</b> — each entry renders as a labeled button; users never see the raw URL.</p>
       <table>
-        <tr><th>Label</th><th>URL</th><th>Description</th><th></th></tr>
+        <tr><th>Label</th><th>Emoji</th><th>URL</th><th>Description</th><th></th></tr>
         ${ls
           .map(
             (l) => `<tr data-label="${esc(l.label)}">
-            <td><b>${esc(l.label)}</b></td><td><a href="${esc(l.url)}" target="_blank">${esc(l.url)}</a></td>
+            <td><b>${esc(l.label)}</b></td><td>${esc(l.emoji ?? '')}</td><td><a href="${esc(l.url)}" target="_blank">${esc(l.url)}</a></td>
             <td>${esc(l.description ?? '')}</td>
             <td><button class="btn small danger l-del">✕</button></td>
           </tr>`,
@@ -595,9 +596,16 @@ function links() {
       </table>
       <div class="inline-form">
         <div><label>Label</label><input id="nl-label" placeholder="Docs"></div>
+        <div><label>Emoji</label><input id="nl-emoji" placeholder="🔗" style="width:60px">
+          <select id="nl-emojipick" style="width:70px"><option value="">😀</option>${EMOJIS.map((e) => `<option value="${e}">${e}</option>`).join('')}</select></div>
         <div><label>URL</label><input id="nl-url" placeholder="https://…"></div>
         <div><label>Description</label><input id="nl-desc" placeholder="optional"></div>
         <button class="btn" id="nl-add">Add</button>
+      </div>
+      <h3 style="margin-top:16px">Post to channel</h3>
+      <div class="inline-form">
+        <div style="flex:2"><select id="nl-channel"><option value="">— pick a channel —</option>${(state.resources?.textChannels ?? []).map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join('')}</select></div>
+        <button class="btn secondary" id="nl-post" ${ls.length ? '' : 'disabled'}>Post links panel</button>
       </div>
     </div>`;
 
@@ -611,6 +619,22 @@ function links() {
       notice('Link removed.');
     };
   });
+  document.getElementById('nl-emojipick').onchange = (e) => {
+    if (e.target.value) document.getElementById('nl-emoji').value = e.target.value;
+  };
+  document.getElementById('nl-post').onclick = async () => {
+    const cid = document.getElementById('nl-channel').value;
+    if (!cid) return notice('Pick a channel first.', false);
+    try {
+      await api(`/api/guilds/${state.guild.id}/links/panel`, {
+        method: 'POST',
+        body: JSON.stringify({ channelId: cid }),
+      });
+      notice('Links panel posted.');
+    } catch (e) {
+      notice(e.message, false);
+    }
+  };
   document.getElementById('nl-add').onclick = async () => {
     try {
       await api(`/api/guilds/${state.guild.id}/links`, {
@@ -619,6 +643,7 @@ function links() {
           label: document.getElementById('nl-label').value.trim(),
           url: document.getElementById('nl-url').value.trim(),
           description: document.getElementById('nl-desc').value.trim() || null,
+          emoji: document.getElementById('nl-emoji').value.trim() || null,
         }),
       });
       await reloadOverview('links');

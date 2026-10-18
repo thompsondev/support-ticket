@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS links (
   label TEXT NOT NULL,
   url TEXT NOT NULL,
   description TEXT,
+  emoji TEXT,
   UNIQUE(guild_id, label)
 );
 CREATE TABLE IF NOT EXISTS blacklist (
@@ -449,6 +450,7 @@ CREATE TABLE IF NOT EXISTS links (
   label TEXT NOT NULL,
   url TEXT NOT NULL,
   description TEXT,
+  emoji TEXT,
   UNIQUE(guild_id, label)
 );
 CREATE TABLE IF NOT EXISTS blacklist (
@@ -736,6 +738,12 @@ async function initSchema(): Promise<void> {
     if (!ttCols.includes('button_style')) {
       sqlite.exec('ALTER TABLE ticket_types ADD COLUMN button_style TEXT');
     }
+    const linkCols = (sqlite.prepare('PRAGMA table_info(links)').all() as { name: string }[]).map(
+      (c) => c.name,
+    );
+    if (!linkCols.includes('emoji')) {
+      sqlite.exec('ALTER TABLE links ADD COLUMN emoji TEXT');
+    }
     return;
   }
   const p = pg!;
@@ -756,6 +764,7 @@ async function initSchema(): Promise<void> {
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS category_id TEXT');
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS instant INTEGER NOT NULL DEFAULT 1');
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS button_style TEXT');
+  await p.query('ALTER TABLE links ADD COLUMN IF NOT EXISTS emoji TEXT');
 }
 
 let initPromise: Promise<void> | null = null;
@@ -874,6 +883,7 @@ export interface LinkRow {
   label: string;
   url: string;
   description: string | null;
+  emoji: string | null;
 }
 
 // ---------- guild config ----------
@@ -1001,8 +1011,8 @@ export async function getLinks(guildId: string): Promise<LinkRow[]> {
   return await D.all('SELECT * FROM links WHERE guild_id = ? ORDER BY label', [guildId]) as unknown as LinkRow[];
 }
 
-export async function addLink(guildId: string, label: string, url: string, description: string | null): Promise<boolean> {
-  const res = await D.run('INSERT OR IGNORE INTO links (guild_id, label, url, description) VALUES (?, ?, ?, ?)', [guildId, label, url, description]);
+export async function addLink(guildId: string, label: string, url: string, description: string | null, emoji?: string | null): Promise<boolean> {
+  const res = await D.run('INSERT OR IGNORE INTO links (guild_id, label, url, description, emoji) VALUES (?, ?, ?, ?, ?)', [guildId, label, url, description, emoji ?? null]);
   return Number(res.changes) > 0;
 }
 

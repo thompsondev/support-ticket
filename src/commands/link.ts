@@ -4,23 +4,10 @@ import {
   MessageFlags,
   SlashCommandBuilder,
 } from 'discord.js';
-import { addLink, getLinks, removeLink } from '../db';
-import { COLORS, ephemeral, isStaff } from '../util';
+import { addLink, removeLink } from '../db';
+import { linksMessage } from '../links';
+import { ephemeral, isStaff } from '../util';
 import type { Command } from './index';
-
-async function linksEmbed(guildId: string, guildName: string): Promise<EmbedBuilder> {
-  const links = await getLinks(guildId);
-  return new EmbedBuilder()
-    .setTitle(`🔗 ${guildName} — Useful links`)
-    .setColor(COLORS.info)
-    .setDescription(
-      links.length
-        ? links
-            .map((l) => `**[${l.label}](${l.url})**${l.description ? `\n${l.description}` : ''}`)
-            .join('\n\n')
-        : 'No links configured yet. Staff can add them with `/link add`.',
-    );
-}
 
 function validUrl(raw: string): boolean {
   try {
@@ -43,7 +30,8 @@ export const link: Command = {
       s.setName('add').setDescription('Add a link (staff)')
         .addStringOption((o) => o.setName('label').setDescription('Link name').setRequired(true))
         .addStringOption((o) => o.setName('url').setDescription('https://…').setRequired(true))
-        .addStringOption((o) => o.setName('description').setDescription('Short description')),
+        .addStringOption((o) => o.setName('description').setDescription('Short description'))
+        .addStringOption((o) => o.setName('emoji').setDescription('Button emoji (unicode or <:name:id>)')),
     )
     .addSubcommand((s) =>
       s.setName('remove').setDescription('Remove a link (staff)')
@@ -56,10 +44,7 @@ export const link: Command = {
 
     if (sub === 'show' || sub === 'list') {
       const priv = sub === 'list' || (i.options.getBoolean('private') ?? false);
-      await i.reply({
-        embeds: [await linksEmbed(i.guildId, i.guild.name)],
-        flags: priv ? MessageFlags.Ephemeral : undefined,
-      });
+      await i.reply({ ...(await linksMessage(i.guildId, i.guild.name)), flags: priv ? MessageFlags.Ephemeral : undefined });
       return;
     }
 
@@ -75,7 +60,7 @@ export const link: Command = {
         await i.reply(ephemeral('Invalid URL — must start with http:// or https://'));
         return;
       }
-      const added = await addLink(i.guildId, label, url, i.options.getString('description'));
+      const added = await addLink(i.guildId, label, url, i.options.getString('description'), i.options.getString('emoji'));
       await i.reply(
         ephemeral(added ? `✅ Added **${label}**.` : `A link named **${label}** already exists.`),
       );

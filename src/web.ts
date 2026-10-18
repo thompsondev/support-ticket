@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ChannelType, Client, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
 import { env } from './env';
+import { linksMessage } from './links';
 import {
   addFormField,
   addLink,
@@ -735,7 +736,7 @@ export function startWeb(client: Client): void {
   });
 
   app.post('/api/guilds/:gid/links', authed, guildAccess, async (req, res) => {
-    const { label, url, description } = req.body ?? {};
+    const { label, url, description, emoji } = req.body ?? {};
     let parsed: URL;
     try {
       parsed = new URL(String(url));
@@ -750,8 +751,20 @@ export function startWeb(client: Client): void {
       label.slice(0, 80),
       url,
       typeof description === 'string' ? description.slice(0, 200) : null,
+      typeof emoji === 'string' ? emoji.slice(0, 64) : null,
     );
     res.status(ok ? 200 : 409).json({ ok });
+  });
+
+  // post the links panel (button links) into a channel
+  app.post('/api/guilds/:gid/links/panel', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const channel = await client.channels.fetch(String(req.body?.channelId ?? '')).catch(() => null);
+    if (!channel?.isSendable() || channel.isDMBased() || channel.guildId !== gid) {
+      return res.status(400).json({ error: 'invalid_channel' });
+    }
+    await channel.send(await linksMessage(gid, client.guilds.cache.get(gid)?.name ?? 'Links'));
+    res.json({ ok: true });
   });
 
   app.delete('/api/guilds/:gid/links/:label', authed, guildAccess, async (req, res) => {
