@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS ticket_types (
   emoji TEXT,
   category_id TEXT,
   instant INTEGER NOT NULL DEFAULT 1,
+  button_style TEXT,
   position INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, type_id)
 );
@@ -471,6 +472,7 @@ CREATE TABLE IF NOT EXISTS ticket_types (
   emoji TEXT,
   category_id TEXT,
   instant INTEGER NOT NULL DEFAULT 1,
+  button_style TEXT,
   position INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (guild_id, type_id)
 );
@@ -731,6 +733,9 @@ async function initSchema(): Promise<void> {
     if (!ttCols.includes('instant')) {
       sqlite.exec('ALTER TABLE ticket_types ADD COLUMN instant INTEGER NOT NULL DEFAULT 1');
     }
+    if (!ttCols.includes('button_style')) {
+      sqlite.exec('ALTER TABLE ticket_types ADD COLUMN button_style TEXT');
+    }
     return;
   }
   const p = pg!;
@@ -750,6 +755,7 @@ async function initSchema(): Promise<void> {
   await p.query('ALTER TABLE referrals ADD COLUMN IF NOT EXISTS referred_by TEXT');
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS category_id TEXT');
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS instant INTEGER NOT NULL DEFAULT 1');
+  await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS button_style TEXT');
 }
 
 let initPromise: Promise<void> | null = null;
@@ -827,6 +833,7 @@ export interface TicketTypeRow {
   emoji: string | null;
   category_id: string | null;
   instant: number;
+  button_style: string | null;
   position: number;
 }
 
@@ -1049,17 +1056,17 @@ export async function getTicketType(guildId: string, typeId: string): Promise<Ti
 
 export async function addTicketType(
   guildId: string,
-  t: { type_id: string; label: string; description?: string | null; emoji?: string | null; category_id?: string | null; instant?: number },
+  t: { type_id: string; label: string; description?: string | null; emoji?: string | null; category_id?: string | null; instant?: number; button_style?: string | null },
 ): Promise<boolean> {
   const max = await D.get('SELECT COALESCE(MAX(position), -1) AS m FROM ticket_types WHERE guild_id = ?', [guildId]) as { m: number };
-  const res = await D.run('INSERT OR IGNORE INTO ticket_types (guild_id, type_id, label, description, emoji, category_id, instant, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [guildId, t.type_id, t.label, t.description ?? null, t.emoji ?? null, t.category_id ?? null, t.instant ?? 1, max.m + 1]);
+  const res = await D.run('INSERT OR IGNORE INTO ticket_types (guild_id, type_id, label, description, emoji, category_id, instant, button_style, position) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)', [guildId, t.type_id, t.label, t.description ?? null, t.emoji ?? null, t.category_id ?? null, t.instant ?? 1, t.button_style ?? null, max.m + 1]);
   return Number(res.changes) > 0;
 }
 
 export async function updateTicketType(
   guildId: string,
   typeId: string,
-  patch: Partial<Pick<TicketTypeRow, 'label' | 'description' | 'emoji' | 'category_id' | 'instant'>>,
+  patch: Partial<Pick<TicketTypeRow, 'label' | 'description' | 'emoji' | 'category_id' | 'instant' | 'button_style'>>,
 ): Promise<boolean> {
   const keys = Object.keys(patch) as (keyof typeof patch)[];
   if (!keys.length) return true;

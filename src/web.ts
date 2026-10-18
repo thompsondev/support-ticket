@@ -631,7 +631,7 @@ export function startWeb(client: Client): void {
 
   app.post('/api/guilds/:gid/types', authed, guildAccess, async (req, res) => {
     const gid = req.params.gid as string;
-    const { id, label, emoji, description, category_id, instant } = req.body ?? {};
+    const { id, label, emoji, description, category_id, instant, button_style } = req.body ?? {};
     if (!TYPE_ID_RE.test(String(id)) || typeof label !== 'string' || !label.trim()) {
       return res.status(400).json({ error: 'invalid_type' });
     }
@@ -645,16 +645,24 @@ export function startWeb(client: Client): void {
       description: typeof description === 'string' ? description.slice(0, 100) : null,
       category_id: cat,
       instant: typeof instant === 'boolean' ? (instant ? 1 : 0) : undefined,
+      button_style: ['primary', 'secondary', 'success', 'danger'].includes(button_style)
+        ? button_style
+        : null,
     });
     if (ok) await logAudit(req.session.user!.id, 'type_add', req.params.gid as string, String(id));
     res.status(ok ? 200 : 409).json({ ok, error: ok ? undefined : 'exists' });
   });
 
   app.patch('/api/guilds/:gid/types/:typeId', authed, guildAccess, async (req, res) => {
-    const { label, emoji, description, category_id, instant } = req.body ?? {};
+    const { label, emoji, description, category_id, instant, button_style } = req.body ?? {};
     const patch: Record<string, string | number | null> = {};
     if (typeof label === 'string') patch.label = label.slice(0, 100);
     if (typeof instant === 'boolean') patch.instant = instant ? 1 : 0;
+    if (button_style !== undefined) {
+      patch.button_style = ['primary', 'secondary', 'success', 'danger'].includes(button_style)
+        ? button_style
+        : null;
+    }
     if (typeof emoji === 'string' || emoji === null) patch.emoji = emoji?.slice(0, 64) ?? null;
     if (typeof description === 'string' || description === null) {
       patch.description = description?.slice(0, 100) ?? null;

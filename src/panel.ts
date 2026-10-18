@@ -29,13 +29,19 @@ export async function panelMessage(
   const components: ActionRowBuilder<ButtonBuilder | StringSelectMenuBuilder>[] = [];
 
   if (style === 'buttons') {
+    const styles: Record<string, ButtonStyle> = {
+      primary: ButtonStyle.Primary,
+      secondary: ButtonStyle.Secondary,
+      success: ButtonStyle.Success,
+      danger: ButtonStyle.Danger,
+    };
     for (let r = 0; r < types.length; r += 5) {
       const row = new ActionRowBuilder<ButtonBuilder>();
       for (const t of types.slice(r, r + 5)) {
         const b = new ButtonBuilder()
           .setCustomId(`ticket:create:${t.type_id}`)
           .setLabel(t.label)
-          .setStyle(ButtonStyle.Secondary);
+          .setStyle(styles[t.button_style ?? ''] ?? ButtonStyle.Secondary);
         if (t.emoji) b.setEmoji(t.emoji);
         row.addComponents(b);
       }

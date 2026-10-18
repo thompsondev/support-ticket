@@ -413,12 +413,16 @@ function types() {
     (state.resources?.categories ?? [])
       .map((x) => `<option value="${x.id}" ${x.id === sel ? 'selected' : ''}>📁 ${esc(x.name)}</option>`)
       .join('');
+  const colorOpts = (sel) =>
+    [['secondary', '⬜ Gray (default)'], ['primary', '🟦 Blurple'], ['success', '🟩 Green'], ['danger', '🟥 Red']]
+      .map(([v, l]) => `<option value="${v}" ${v === (sel ?? 'secondary') ? 'selected' : ''}>${l}</option>`)
+      .join('');
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Ticket types</h3>
-      <p class="muted">Shown in the panel picker and on tickets. Max 25. A type's <b>category</b> overrides the default open-ticket category — tickets of that type always open there. <b>Instant</b> opens the ticket immediately on click; <b>Ask first</b> shows the intake form/modal.</p>
+      <p class="muted">Shown in the panel picker and on tickets. Max 25. A type's <b>category</b> overrides the default open-ticket category. <b>Instant</b> opens immediately on click; <b>Ask first</b> shows the intake form. <b>Color</b> applies to button-style panels; emoji accepts unicode or a server emoji like <code>&lt;:name:123&gt;</code>.</p>
       <table>
-        <tr><th></th><th>ID</th><th>Label</th><th>Emoji</th><th>Description</th><th>Category</th><th>Opens</th><th></th></tr>
+        <tr><th></th><th>ID</th><th>Label</th><th>Emoji</th><th>Description</th><th>Category</th><th>Opens</th><th>Color</th><th></th></tr>
         ${ts
           .map(
             (t) => `<tr data-id="${esc(t.type_id)}">
@@ -428,6 +432,7 @@ function types() {
             <td><input class="t-desc" value="${esc(t.description ?? '')}"></td>
             <td><select class="t-cat">${catOpts(t.category_id)}</select></td>
             <td><select class="t-instant"><option value="1" ${t.instant ? 'selected' : ''}>⚡ Instant</option><option value="0" ${t.instant ? '' : 'selected'}>📝 Ask first</option></select></td>
+            <td><select class="t-color">${colorOpts(t.button_style)}</select></td>
             <td><button class="btn small secondary t-save">Save</button>
                 <button class="btn small danger t-del">✕</button></td>
           </tr>`,
@@ -441,6 +446,7 @@ function types() {
         <div><label>Description</label><input id="n-desc" placeholder="Priority help"></div>
         <div><label>Category</label><select id="n-cat">${catOpts(null)}</select></div>
         <div><label>Opens</label><select id="n-instant"><option value="1">⚡ Instant</option><option value="0">📝 Ask first</option></select></div>
+        <div><label>Color</label><select id="n-color">${colorOpts(null)}</select></div>
         <button class="btn" id="n-add">Add</button>
       </div>
     </div>`;
@@ -456,6 +462,7 @@ function types() {
           description: tr.querySelector('.t-desc').value || null,
           category_id: tr.querySelector('.t-cat').value || null,
           instant: tr.querySelector('.t-instant').value === '1',
+          button_style: tr.querySelector('.t-color').value || null,
         }),
       });
       await reloadOverview('types');
@@ -497,6 +504,7 @@ function types() {
           description: document.getElementById('n-desc').value.trim() || null,
           category_id: document.getElementById('n-cat').value || null,
           instant: document.getElementById('n-instant').value === '1',
+          button_style: document.getElementById('n-color').value || null,
         }),
       });
       await reloadOverview('types');
