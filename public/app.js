@@ -344,7 +344,6 @@ function settings() {
       </div>
       <h3 style="margin-top:20px">Limits</h3>
       <div class="row">
-        <div><label>Max open tickets / user</label><input id="f-max" type="number" min="1" max="10" value="${c.max_tickets}"></div>
         <div><label>Cooldown (seconds)</label><input id="f-cd" type="number" min="0" value="${c.cooldown_seconds}"></div>
         <div><label>Auto-close after idle hours (0 = off)</label><input id="f-ac" type="number" min="0" max="168" value="${c.autoclose_hours}"></div>
         <div><label>Staff escalation (min, 0 = off)</label><input id="f-esc" type="number" min="0" value="${c.escalation_minutes}"></div>
@@ -382,7 +381,6 @@ function settings() {
       transcript_channel_id: document.getElementById('f-trans').value || null,
       open_category_id: document.getElementById('f-opencat').value || null,
       closed_category_id: document.getElementById('f-closedcat').value || null,
-      max_tickets: Number(document.getElementById('f-max').value),
       cooldown_seconds: Number(document.getElementById('f-cd').value),
       autoclose_hours: Number(document.getElementById('f-ac').value),
       escalation_minutes: Number(document.getElementById('f-esc').value),

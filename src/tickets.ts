@@ -70,8 +70,8 @@ export async function createTicket(
   }
 
   const open = await openTicketCount(guild.id, user.id);
-  if (open >= cfg.max_tickets) {
-    return { ok: false, reason: `You already have ${open} open ticket(s) (limit: ${cfg.max_tickets}).` };
+  if (open >= 1) {
+    return { ok: false, reason: 'You already have an open ticket — please use it or ask staff to close it first.' };
   }
 
   const me = guild.members.me;
