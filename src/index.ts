@@ -7,6 +7,7 @@ import {
   ContextMenuCommandBuilder,
   EmbedBuilder,
   Guild,
+  GuildMember,
   Events,
   GatewayIntentBits,
   InteractionContextType,
@@ -54,6 +55,7 @@ import {
   updateWatch,
   upsertStarEntry,
 } from './db';
+import type { GuildConfig } from './db';
 import { endPoll } from './votes';
 import { endGiveaway } from './giveaways';
 import { welcomeCard } from './cards';
@@ -133,6 +135,19 @@ client.once(Events.ClientReady, async (c) => {
   }
   // snapshot invite use-counts so joins can be attributed to staff invites
   for (const g of client.guilds.cache.values()) void cacheGuildInvites(g);
+  // apply staff badges to existing staff (best-effort, smaller guilds only)
+  for (const g of client.guilds.cache.values()) {
+    if (g.memberCount > 10000) continue;
+    void (async () => {
+      const cfg = await getConfig(g.id);
+      if (cfg.disabled) return;
+      const members = await g.members.fetch().catch(() => null);
+      if (!members) return;
+      for (const m of members.values()) {
+        if (isStaffMember(m, cfg)) await syncStaffBadge(m, cfg);
+      }
+    })().catch(() => {});
+  }
   // maintenance sweep every 5 minutes: ticket inactivity + poll expiry
   setInterval(async () => {
     autoCloseSweep(client).catch(console.error);
@@ -458,6 +473,45 @@ client.on(Events.VoiceStateUpdate, async (oldS, newS) => {
   } catch (err) {
     console.error('voiceStateUpdate error:', err);
   }
+});
+
+// ---------- staff badge ("verified tick") ----------
+
+function badgeFor(cfg: GuildConfig): string {
+  return (cfg.badge_emoji ?? '✅').trim() || '✅';
+}
+
+function isStaffMember(member: GuildMember, cfg: GuildConfig): boolean {
+  return (
+    (!!cfg.support_role_id && member.roles.cache.has(cfg.support_role_id)) ||
+    (!!cfg.admin_role_id && member.roles.cache.has(cfg.admin_role_id))
+  );
+}
+
+async function syncStaffBadge(member: GuildMember, cfg: GuildConfig): Promise<void> {
+  if (member.user.bot || member.id === member.guild.ownerId) return;
+  const badge = badgeFor(cfg);
+  const name = member.displayName;
+  const hasBadge = name.endsWith(` ${badge}`) || name === badge;
+  if (isStaffMember(member, cfg) && !hasBadge) {
+    const base = name.slice(0, 32 - badge.length - 1).trimEnd();
+    await member.setNickname(`${base} ${badge}`).catch(() => {});
+  } else if (!isStaffMember(member, cfg) && hasBadge) {
+    const base = name.replace(new RegExp(`\\s*${badge.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*$`), '');
+    await member.setNickname(base === member.user.username ? null : base).catch(() => {});
+  }
+}
+
+client.on(Events.GuildMemberUpdate, async (oldM, newM) => {
+  try {
+    const cfg = await getConfig(newM.guild.id);
+    if (cfg.disabled) return;
+    const changed =
+      oldM.roles.cache.size !== newM.roles.cache.size ||
+      oldM.roles.cache.some((r) => !newM.roles.cache.has(r.id)) ||
+      newM.roles.cache.some((r) => !oldM.roles.cache.has(r.id));
+    if (changed || newM.nickname !== oldM.nickname) await syncStaffBadge(newM, cfg);
+  } catch { /* non-fatal */ }
 });
 
 // ---------- audit logging (leave / delete / edit) ----------

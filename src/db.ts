@@ -404,7 +404,8 @@ CREATE TABLE IF NOT EXISTS guild_config (
   welcome_card INTEGER NOT NULL DEFAULT 0,
   starboard_channel_id TEXT,
   starboard_threshold INTEGER NOT NULL DEFAULT 0,
-  voice_hub_channel_id TEXT
+  voice_hub_channel_id TEXT,
+  badge_emoji TEXT
 );
 CREATE TABLE IF NOT EXISTS tickets (
   id BIGSERIAL PRIMARY KEY,
@@ -670,6 +671,7 @@ CREATE TABLE IF NOT EXISTS watchlist (
 const CFG_TEXT_COLS = [
   'panel_title', 'panel_description', 'welcome_channel_id', 'welcome_message',
   'autorole_id', 'suggestions_channel_id', 'starboard_channel_id', 'voice_hub_channel_id',
+  'badge_emoji',
 ];
 const CFG_INT_COLS = ['seeded', 'escalation_minutes', 'disabled', 'welcome_card', 'starboard_threshold'];
 const TICKET_INT_COLS = ['first_staff_reply_at', 'escalated_at'];
@@ -832,6 +834,7 @@ export interface GuildConfig {
   starboard_channel_id: string | null;
   starboard_threshold: number;
   voice_hub_channel_id: string | null;
+  badge_emoji: string | null;
 }
 
 export interface TicketTypeRow {

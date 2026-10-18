@@ -340,6 +340,7 @@ function settings() {
         <div><label>Transcript channel</label><select id="f-trans">${chanOpts(c.transcript_channel_id)}</select></div>
         <div><label>Open-ticket category</label><select id="f-opencat">${catOpts(c.open_category_id)}</select></div>
         <div><label>Closed-ticket category</label><select id="f-closedcat">${catOpts(c.closed_category_id)}</select></div>
+        <div><label>Staff badge (appended to nicknames)</label><input id="f-badge" maxlength="8" value="${esc(c.badge_emoji ?? '✅')}" placeholder="✅"></div>
       </div>
       <h3 style="margin-top:20px">Limits</h3>
       <div class="row">
@@ -393,6 +394,7 @@ function settings() {
       starboard_channel_id: document.getElementById('f-star').value || null,
       starboard_threshold: Number(document.getElementById('f-starth').value),
       voice_hub_channel_id: document.getElementById('f-vhub').value || null,
+      badge_emoji: document.getElementById('f-badge').value || null,
       panel_title: document.getElementById('f-ptitle').value || null,
       panel_description: document.getElementById('f-pdesc').value || null,
     };

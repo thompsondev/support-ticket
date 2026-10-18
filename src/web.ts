@@ -664,6 +664,9 @@ export function startWeb(client: Client): void {
     for (const k of ['panel_title', 'panel_description', 'welcome_message'] as const) {
       if (typeof b[k] === 'string' || b[k] === null) patch[k] = b[k]?.slice(0, 1000) ?? null;
     }
+    if (typeof b.badge_emoji === 'string' || b.badge_emoji === null) {
+      patch.badge_emoji = b.badge_emoji?.slice(0, 16) ?? null;
+    }
     await saveConfig(gid, patch);
     await logAudit(req.session.user!.id, 'config_update', gid, Object.keys(patch).join(','));
     res.json({ ok: true, config: await getConfig(gid) });
