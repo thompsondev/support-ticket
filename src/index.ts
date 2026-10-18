@@ -235,9 +235,38 @@ client.on(Events.InteractionCreate, async (i) => {
         target.content || 'a support request',
         guildName,
       );
-      await i.reply({
-        embeds: [new EmbedBuilder().setColor(COLORS.info).setDescription(text)],
-      });
+      const embed = new EmbedBuilder().setColor(COLORS.info).setDescription(text);
+      // try public first — if the server's filters block or delete it, the
+      // invite goes to the target's DMs instead
+      let visible = false;
+      try {
+        await i.reply({ embeds: [embed], fetchReply: true });
+        await new Promise((r) => setTimeout(r, 2500));
+        visible = await i.fetchReply().then(() => true).catch(() => false);
+      } catch {
+        visible = false;
+      }
+      if (!visible && !target.author.bot) {
+        const dmOk = await target.author
+          .send({
+            embeds: [
+              new EmbedBuilder()
+                .setColor(COLORS.info)
+                .setTitle('Support invite')
+                .setDescription(
+                  `A community member in **${guildName}** pointed you to our support hub.\n\n👉 ${hubInvite}`,
+                ),
+            ],
+          })
+          .then(() => true)
+          .catch(() => false);
+        const content = dmOk
+          ? `That reply was filtered by the server — I **DM'd <@${target.author.id}> the invite** instead.`
+          : `The reply was filtered and their DMs are closed — share the invite manually or point them to ${env.dashboardUrl}.`;
+        const opts = { content, flags: MessageFlags.Ephemeral as const };
+        if (i.replied || i.deferred) await i.followUp(opts).catch(() => {});
+        else await i.reply(opts).catch(() => {});
+      }
       if (i.guildId && !target.author.bot) {
         await addReferral(i.guildId, target.author.id, i.channelId ?? '', target.id, i.user.id).catch(
           () => {},
