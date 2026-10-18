@@ -1030,6 +1030,33 @@ export async function removeLink(guildId: string, label: string): Promise<boolea
   return Number(res.changes) > 0;
 }
 
+export async function updateLink(
+  guildId: string,
+  id: number,
+  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji'>>,
+): Promise<'ok' | 'missing' | 'duplicate'> {
+  const keys = Object.keys(patch) as (keyof typeof patch)[];
+  if (!keys.length) return 'ok';
+  if (patch.label) {
+    const dup = await D.get('SELECT 1 FROM links WHERE guild_id = ? AND label = ? AND id <> ?', [
+      guildId,
+      patch.label,
+      id,
+    ]);
+    if (dup) return 'duplicate';
+  }
+  const res = await D.run(
+    `UPDATE links SET ${keys.map((k) => `${k} = ?`).join(', ')} WHERE guild_id = ? AND id = ?`,
+    [...keys.map((k) => patch[k] as string | null), guildId, id],
+  );
+  return Number(res.changes) > 0 ? 'ok' : 'missing';
+}
+
+export async function setAllLinksUrl(guildId: string, url: string): Promise<number> {
+  const res = await D.run('UPDATE links SET url = ? WHERE guild_id = ?', [url, guildId]);
+  return Number(res.changes);
+}
+
 // ---------- blacklist ----------
 
 export async function isBlacklisted(guildId: string, userId: string): Promise<boolean> {

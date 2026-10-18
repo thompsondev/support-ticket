@@ -607,14 +607,21 @@ function links() {
     <div class="card">
       <h3>Links</h3>
       <p class="muted">Posted by <code>/issues</code> or via <b>Post to channel</b> — renders as a <b>"Select Category of your Issues"</b> dropdown. Picking an entry shows the user a self-service Resolve button (URL hidden); every click is logged to your log channel.</p>
+      <div class="inline-form" style="margin-bottom:10px">
+        <div style="flex:2"><label>Set URL for all ${ls.length} links</label><input id="nl-url-all" placeholder="https://… — applied to every entry"></div>
+        <button class="btn secondary" id="nl-url-all-btn" ${ls.length ? '' : 'disabled'}>Apply to all</button>
+      </div>
       <table>
         <tr><th>Label</th><th>Emoji</th><th>URL</th><th>Description</th><th></th></tr>
         ${ls
           .map(
-            (l) => `<tr data-label="${esc(l.label)}">
-            <td><b>${esc(l.label)}</b></td><td>${esc(l.emoji ?? '')}</td><td><a href="${esc(l.url)}" target="_blank">${esc(l.url)}</a></td>
-            <td>${esc(l.description ?? '')}</td>
-            <td><button class="btn small danger l-del">✕</button></td>
+            (l) => `<tr data-id="${l.id}" data-label="${esc(l.label)}">
+            <td><input class="l-label" value="${esc(l.label)}" style="min-width:140px"></td>
+            <td><input class="l-emoji" value="${esc(l.emoji ?? '')}" style="width:52px"></td>
+            <td><input class="l-url" value="${esc(l.url)}" placeholder="https://…"></td>
+            <td><input class="l-desc" value="${esc(l.description ?? '')}"></td>
+            <td style="white-space:nowrap"><button class="btn small l-save">💾</button>
+              <button class="btn small danger l-del">✕</button></td>
           </tr>`,
           )
           .join('')}
@@ -645,14 +652,49 @@ function links() {
 
   document.querySelectorAll('.l-del').forEach((b) => {
     b.onclick = async () => {
+      const tr = b.closest('tr');
       await api(
-        `/api/guilds/${state.guild.id}/links/${encodeURIComponent(b.closest('tr').dataset.label)}`,
+        `/api/guilds/${state.guild.id}/links/${encodeURIComponent(tr.dataset.label)}`,
         { method: 'DELETE' },
       );
       await reloadOverview('links');
       notice('Link removed.');
     };
   });
+  document.querySelectorAll('.l-save').forEach((b) => {
+    b.onclick = async () => {
+      const tr = b.closest('tr');
+      try {
+        await api(`/api/guilds/${state.guild.id}/links/${tr.dataset.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({
+            label: tr.querySelector('.l-label').value.trim(),
+            emoji: tr.querySelector('.l-emoji').value.trim(),
+            url: tr.querySelector('.l-url').value.trim(),
+            description: tr.querySelector('.l-desc').value.trim(),
+          }),
+        });
+        await reloadOverview('links');
+        notice('Link updated.');
+      } catch (e) {
+        notice(e.message === 'duplicate_label' ? 'Another link already has that label.' : e.message === 'invalid_url' ? 'URL must start with http:// or https://' : e.message, false);
+      }
+    };
+  });
+  document.getElementById('nl-url-all-btn').onclick = async () => {
+    const url = document.getElementById('nl-url-all').value.trim();
+    if (!url) return notice('Enter a URL first.', false);
+    try {
+      const r = await api(`/api/guilds/${state.guild.id}/links/url-all`, {
+        method: 'POST',
+        body: JSON.stringify({ url }),
+      });
+      await reloadOverview('links');
+      notice(`URL updated on ${r.updated} link(s).`);
+    } catch (e) {
+      notice(e.message === 'invalid_url' ? 'URL must start with http:// or https://' : e.message, false);
+    }
+  };
   document.getElementById('nl-emojipick').onchange = (e) => {
     if (e.target.value) document.getElementById('nl-emoji').value = e.target.value;
   };

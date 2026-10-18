@@ -55,6 +55,7 @@ import {
   removeCustomCommand,
   removeFormField,
   removeLink,
+  setAllLinksUrl,
   removeSatellite,
   removeSticky,
   removeTag,
@@ -68,11 +69,13 @@ import {
   setUserProfile,
   setTag,
   unbindReactionRole,
+  updateLink,
   updateSatellite,
   updateSticky,
   updateTicketType,
   updateWatch,
   type GuildConfig,
+  type LinkRow,
 } from './db';
 import { endGiveaway, giveawayMessage } from './giveaways';
 import { parseEmoji } from './commands/reactionrole';
@@ -787,6 +790,48 @@ export function startWeb(client: Client): void {
       typeof emoji === 'string' ? emoji.slice(0, 64) : null,
     );
     res.status(ok ? 200 : 409).json({ ok });
+  });
+
+  // edit a single link — any field (label, url, description, emoji)
+  app.patch('/api/guilds/:gid/links/:id', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const id = Number(req.params.id);
+    const b = req.body ?? {};
+    const patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji'>> = {};
+    if (typeof b.label === 'string' && b.label.trim()) patch.label = b.label.trim().slice(0, 80);
+    if (typeof b.url === 'string') {
+      try {
+        const p = new URL(b.url);
+        if (!['http:', 'https:'].includes(p.protocol)) throw new Error('bad');
+      } catch {
+        return res.status(400).json({ error: 'invalid_url' });
+      }
+      patch.url = b.url;
+    }
+    if (typeof b.description === 'string' || b.description === null)
+      patch.description = (b.description ?? '').slice(0, 200) || null;
+    if (typeof b.emoji === 'string' || b.emoji === null)
+      patch.emoji = (b.emoji ?? '').slice(0, 64) || null;
+    const r = await updateLink(gid, id, patch);
+    if (r === 'missing') return res.status(404).json({ error: 'not_found' });
+    if (r === 'duplicate') return res.status(409).json({ error: 'duplicate_label' });
+    await logAudit(req.session.user!.id, 'link_update', gid, `link ${id}`);
+    res.json({ ok: true });
+  });
+
+  // bulk edit — set the same URL on every link in the guild
+  app.post('/api/guilds/:gid/links/url-all', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const { url } = req.body ?? {};
+    try {
+      const p = new URL(String(url));
+      if (!['http:', 'https:'].includes(p.protocol)) throw new Error('bad');
+    } catch {
+      return res.status(400).json({ error: 'invalid_url' });
+    }
+    const updated = await setAllLinksUrl(gid, url);
+    await logAudit(req.session.user!.id, 'links_url_all', gid, `${updated} links`);
+    res.json({ ok: true, updated });
   });
 
   // bulk add — one shared URL + a list of labels creates many link buttons
