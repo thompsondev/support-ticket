@@ -216,7 +216,33 @@ const NAV = [
     ['settings', 'Settings'],
     ['audit', 'Audit'],
   ]],
+  ['HELP', [
+    ['guide', '❓ Guide & FAQ'],
+  ]],
 ];
+
+// One-line "how to use this" hint shown at the top of every tab.
+const TAB_HELP = {
+  overview: 'A live snapshot of this server — open tickets, activity and health. Everything is configured in the tabs on the left.',
+  tickets: 'Every ticket in this server — open, closed, claimed. Members create them by clicking a type on the panel you post (see the Panel tab).',
+  transcripts: 'When a ticket closes, a full HTML transcript is saved here. Open one to read the whole conversation, or share the link.',
+  panel: 'Post the ticket panel into a Discord channel — members click a ticket type and a private channel opens for them.',
+  types: 'The categories on your ticket panel (max 25). Each can have an emoji, a button color, its own Discord category, and either open instantly or ask questions first.',
+  forms: 'Custom intake questions per ticket type. Only used for types set to "Ask first" — instant types skip the form.',
+  links: 'The self-service issue picker (run /issues in Discord). Set one shared URL for all issues — a per-category suffix like ?migration is auto-added, and every button click notifies your log channel.',
+  suggestions: 'Members submit ideas with /suggest new — approve or deny them here or in Discord.',
+  giveaways: 'Create timed giveaways; members enter by clicking a button on the giveaway message. End or reroll from here.',
+  rroles: 'Bind an emoji on a message to a role — anyone who reacts gets that role automatically.',
+  sticky: 'A sticky message stays pinned at the bottom of a channel and is reposted after every new message.',
+  tags: 'Canned replies. Staff run /tag send <name> in Discord to paste a saved answer instantly.',
+  commands: 'Custom text commands for your server — /cmd run <name> posts your saved content.',
+  automod: "Discord-native AutoMod rules created by the bot — keyword filters, spam, mention-spam and invite blocking.",
+  blacklist: 'Users on this list cannot open tickets. Useful for blocking repeated abusers.',
+  satellite: 'The referral funnel — link satellite servers to this hub and track who was routed and who converted.',
+  settings: 'Core configuration: staff & admin roles, log channel, ticket categories, welcome/autorole, starboard, voice hub and the staff badge.',
+  audit: 'A record of every change made through this dashboard — who did what, and when.',
+  guide: 'Start here if you are new — step-by-step setup and answers to common questions.',
+};
 
 function clearNav() {
   document.getElementById('sidebar-nav').innerHTML = '';
@@ -256,7 +282,14 @@ function renderGuild() {
   document.querySelectorAll('.nav-item').forEach(
     (t) => (t.onclick = () => { state.tab = t.dataset.tab; renderGuild(); }),
   );
-  ({ overview, settings, types, forms, links, tags, suggestions, tickets, transcripts, giveaways, rroles, sticky, automod, commands, blacklist, audit, satellite, panel })[state.tab]();
+  ({ overview, settings, types, forms, links, tags, suggestions, tickets, transcripts, giveaways, rroles, sticky, automod, commands, blacklist, audit, satellite, panel, guide })[state.tab]();
+  const hint = TAB_HELP[state.tab];
+  if (hint) {
+    document.getElementById('tab-body').insertAdjacentHTML(
+      'afterbegin',
+      `<div class="hint">💡 ${esc(hint)}</div>`,
+    );
+  }
 }
 
 // ---------- overview ----------
@@ -1734,6 +1767,64 @@ async function discover() {
       }
     };
   });
+}
+
+// ---------- guide & FAQ ----------
+
+function guide() {
+  const step = (n, t, d) => `<div class="guide-step"><b>${n}. ${t}</b><p class="muted">${d}</p></div>`;
+  const faq = (q, a) => `<details class="faq"><summary>${q}</summary><p>${a}</p></details>`;
+  document.getElementById('tab-body').innerHTML = `
+    <div class="card">
+      <h3>📘 Getting started — full setup in 5 minutes</h3>
+      ${step(1, 'Invite the bot', 'Use the invite link on the landing page (or the bot\'s "Add App" button). The bot needs Administrator-level permissions to manage ticket channels, nicknames and AutoMod.')}
+      ${step(2, 'Open this dashboard', 'Log in with Discord. You only see servers where you have Manage Server <b>and</b> the bot is installed.')}
+      ${step(3, 'Set roles & channels', 'Go to <b>Settings</b>: pick the <b>Support role</b> (your staff), optionally an <b>Admin role</b>, a <b>Log channel</b> (all events go here — required for link-click notifications), a <b>Transcript channel</b>, and the <b>open/closed ticket categories</b>. Save.')}
+      ${step(4, 'Create ticket types', '<b>Ticket Types</b> tab → add your categories (or hit <b>Import crypto support pack</b> for the ready-made 23-issue list). Each type can have an emoji, button color, its own Discord category, and Instant vs Ask-first opening.')}
+      ${step(5, 'Post the panel', '<b>Panel</b> tab → pick a channel → Post. Members click a type → a private ticket channel opens instantly.')}
+      ${step(6, 'Add self-service issues', '<b>Links</b> tab → <b>Load crypto issue list</b> → set your shared URL once → <b>Add all</b>. Then run <code>/issues</code> in Discord or use <b>Post issue picker</b> to put the dropdown in a channel.')}
+    </div>
+
+    <div class="card">
+      <h3>🎫 How tickets work</h3>
+      ${faq('How does a member open a ticket?', 'They click a type on your panel (or the dropdown). <b>Instant</b> types open the channel immediately; <b>Ask first</b> types show a form with your questions (Forms tab). Each member can only have <b>one open ticket</b> at a time.')}
+      ${faq('Who can see a ticket?', 'The member who opened it, plus anyone with the Support or Admin role. Everyone else is blocked by channel permissions.')}
+      ${faq('How do staff handle tickets?', 'Inside the ticket: <b>Claim</b> to take ownership, type normally to reply, <b>Close</b> when done — a transcript is saved and the member gets a rating request. Commands: <code>/ticket add|remove|rename|priority|move|note|list</code>.')}
+      ${faq('Can I reopen a ticket?', 'Yes — from the Tickets tab or with <code>/ticket reopen</code> inside the closed channel. It moves back to the open category.')}
+      ${faq('What does the staff badge (✅) do?', 'Settings → <b>Staff badge</b>. Anyone with the Support/Admin role gets the emoji appended to their nickname automatically (a "verified" look). Removed if they lose the role.')}
+    </div>
+
+    <div class="card">
+      <h3>🔗 Self-service issues (/issues)</h3>
+      ${faq('What is the issue picker?', '<code>/issues</code> posts a <b>"Select Category of your Issues"</b> dropdown. The member picks one → gets a self-service card with a <b>Resolve this issue</b> button. Clicking opens your link — the raw URL is never shown.')}
+      ${faq('How do click notifications work?', 'The button goes through a tracked redirect on this site first — your <b>Log channel</b> gets "<i>@user clicked the resolution link for X</i>" before they reach the destination. If no log channel is set, clicks still work but nothing is logged.')}
+      ${faq('What is the URL suffix?', 'Set one base URL (e.g. <code>https://yoursite.com</code>) and each issue gets a tag appended automatically — <code>?migration</code>, <code>?claim</code> — so your site knows which issue brought each visitor. Editable per row; "Set URL for all" updates only the base.')}
+      ${faq('How do I change what an issue links to?', 'Links tab → edit any field inline (label, emoji, URL, suffix, description) → 💾. Or use "Set URL for all" to repoint everything at once.')}
+    </div>
+
+    <div class="card">
+      <h3>🛰️ Satellite servers & referrals</h3>
+      ${faq('What is a satellite?', 'Another server that feeds users to your support hub. Staff install the app to their own account, set their hub under <b>Coin discovery → My support hub</b>, then right-click a complaint in any server → <b>Apps → Route to Support</b> to send that user an invite.')}
+      ${faq('How is staff credited?', 'Each staff member\'s hub invite is unique — joins through it are attributed to them automatically (even if they paste the link manually). Referrals show in the Satellite tab and in your log channel.')}
+      ${faq('What if a server blocks invite links?', 'Route to Support posts publicly first; if the reply is filtered, the bot automatically <b>DMs the invite</b> to the user instead and tells the staff member.')}
+    </div>
+
+    <div class="card">
+      <h3>🎉 Community features</h3>
+      ${faq('What else can the bot do?', 'Suggestions with voting, timed giveaways, reaction roles, sticky messages, AFK status, custom commands, canned tags, polls, starboard, join-to-create voice channels, welcome cards — all configured in the tabs on the left.')}
+      ${faq('How does AutoMod work?', 'The AutoMod tab creates Discord-native rules (keyword filters, spam, mention-spam, invite blocking) — they run even if the bot is briefly offline.')}
+    </div>
+
+    <div class="card">
+      <h3>❓ Troubleshooting</h3>
+      ${faq('Slash commands don\'t appear', 'Commands register when the bot starts — after a deploy wait ~1 minute, then restart Discord (Ctrl+R). If still missing, re-invite the bot with the <code>applications.commands</code> scope.')}
+      ${faq('I can\'t see my server in the dashboard', 'You need the <b>Manage Server</b> permission <b>and</b> the bot must be installed in that server. Invite it first, then refresh.')}
+      ${faq('Dashboard looks outdated after a deploy', 'Hard refresh once (Ctrl+F5). Pages serve a per-boot version token so later deploys bust the cache automatically.')}
+      ${faq('Badge doesn\'t appear on staff', 'Check the bot has <b>Manage Nicknames</b> and its role sits above staff roles in Server Settings → Roles. The server owner can\'t be renamed by a bot — Discord limitation.')}
+      ${faq('Link clicks aren\'t being logged', 'Set a <b>Log channel</b> in Settings — that\'s where click notifications, ticket events and referral joins are posted.')}
+      ${faq('A ticket type fails to open', 'If you assigned it a Discord category that was later deleted, re-select the category in Ticket Types and save.')}
+    </div>
+    <p class="muted" style="margin-top:8px">For educational purposes only.</p>`;
 }
 
 async function reloadOverview(tab) {
