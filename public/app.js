@@ -612,13 +612,14 @@ function links() {
         <button class="btn secondary" id="nl-url-all-btn" ${ls.length ? '' : 'disabled'}>Apply to all</button>
       </div>
       <table>
-        <tr><th>Label</th><th>Emoji</th><th>URL</th><th>Description</th><th></th></tr>
+        <tr><th>Label</th><th>Emoji</th><th>URL</th><th>Suffix</th><th>Description</th><th></th></tr>
         ${ls
           .map(
             (l) => `<tr data-id="${l.id}" data-label="${esc(l.label)}">
             <td><input class="l-label" value="${esc(l.label)}" style="min-width:140px"></td>
             <td><input class="l-emoji" value="${esc(l.emoji ?? '')}" style="width:52px"></td>
             <td><input class="l-url" value="${esc(l.url)}" placeholder="https://…"></td>
+            <td><input class="l-suffix" value="${esc(l.suffix ?? '')}" placeholder="?tag" style="width:90px"></td>
             <td><input class="l-desc" value="${esc(l.description ?? '')}"></td>
             <td style="white-space:nowrap"><button class="btn small l-save">💾</button>
               <button class="btn small danger l-del">✕</button></td>
@@ -631,11 +632,12 @@ function links() {
         <div><label>Emoji</label><input id="nl-emoji" placeholder="🔗" style="width:60px">
           <select id="nl-emojipick" style="width:70px"><option value="">😀</option>${EMOJIS.map((e) => `<option value="${e}">${e}</option>`).join('')}</select></div>
         <div><label>URL</label><input id="nl-url" placeholder="https://…"></div>
+        <div><label>Suffix</label><input id="nl-suffix" placeholder="?tag" style="width:80px"></div>
         <div><label>Description</label><input id="nl-desc" placeholder="optional"></div>
         <button class="btn" id="nl-add">Add</button>
       </div>
       <h3 style="margin-top:16px">Quick list — one link, many buttons</h3>
-      <p class="muted">One shared URL for every entry. One per line: <code>Label | optional description</code></p>
+      <p class="muted">One shared URL for every entry — a per-category suffix (<code>?migration</code>, <code>?claim</code>…) is auto-added from each label. One per line: <code>Label | optional description | optional ?suffix</code></p>
       <div class="inline-form">
         <div style="flex:2"><label>Shared URL</label><input id="nl-bulk-url" placeholder="https://discord.gg/your-hub or your site"></div>
         <div><label>Emoji for all</label><input id="nl-bulk-emoji" placeholder="🔗" style="width:60px"></div>
@@ -671,6 +673,7 @@ function links() {
             label: tr.querySelector('.l-label').value.trim(),
             emoji: tr.querySelector('.l-emoji').value.trim(),
             url: tr.querySelector('.l-url').value.trim(),
+            suffix: tr.querySelector('.l-suffix').value.trim(),
             description: tr.querySelector('.l-desc').value.trim(),
           }),
         });
@@ -710,8 +713,12 @@ function links() {
       .map((l) => l.trim())
       .filter(Boolean)
       .map((l) => {
-        const [label, ...rest] = l.split('|');
-        return { label: label.trim(), description: rest.join('|').trim() || undefined };
+        const [label, desc, suffix] = l.split('|');
+        return {
+          label: label.trim(),
+          description: desc?.trim() || undefined,
+          suffix: suffix?.trim() || undefined,
+        };
       });
     if (!items.length) return notice('Paste at least one label line.', false);
     try {
@@ -746,6 +753,7 @@ function links() {
         body: JSON.stringify({
           label: document.getElementById('nl-label').value.trim(),
           url: document.getElementById('nl-url').value.trim(),
+          suffix: document.getElementById('nl-suffix').value.trim() || null,
           description: document.getElementById('nl-desc').value.trim() || null,
           emoji: document.getElementById('nl-emoji').value.trim() || null,
         }),

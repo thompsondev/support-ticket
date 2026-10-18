@@ -276,7 +276,7 @@ export function startWeb(client: Client): void {
         }).catch(() => {});
       }
     }
-    res.redirect(link.url);
+    res.redirect(link.url + (link.suffix ?? ''));
   });
 
   const redirectUri = `${env.dashboardUrl}/auth/callback`;
@@ -771,8 +771,20 @@ export function startWeb(client: Client): void {
     await logAudit(req.session.user!.id, 'type_remove', req.params.gid as string, req.params.typeId as string);
   });
 
+  // URL suffix helpers — "?migration" appended to the base URL per link.
+  // Bulk flows auto-derive it from the label's first word ("Claim Reward" → ?claim).
+  const cleanSuffix = (v: unknown): string | null => {
+    if (typeof v !== 'string' || !v.trim()) return null;
+    const s = v.trim().slice(0, 64);
+    return /^[?/&#]/.test(s) ? s : `?${s}`;
+  };
+  const autoSuffix = (label: string): string | null => {
+    const w = label.toLowerCase().match(/[a-z0-9]+/)?.[0];
+    return w ? `?${w}` : null;
+  };
+
   app.post('/api/guilds/:gid/links', authed, guildAccess, async (req, res) => {
-    const { label, url, description, emoji } = req.body ?? {};
+    const { label, url, description, emoji, suffix } = req.body ?? {};
     let parsed: URL;
     try {
       parsed = new URL(String(url));
@@ -788,6 +800,7 @@ export function startWeb(client: Client): void {
       url,
       typeof description === 'string' ? description.slice(0, 200) : null,
       typeof emoji === 'string' ? emoji.slice(0, 64) : null,
+      cleanSuffix(suffix),
     );
     res.status(ok ? 200 : 409).json({ ok });
   });
@@ -797,7 +810,7 @@ export function startWeb(client: Client): void {
     const gid = req.params.gid as string;
     const id = Number(req.params.id);
     const b = req.body ?? {};
-    const patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji'>> = {};
+    const patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji' | 'suffix'>> = {};
     if (typeof b.label === 'string' && b.label.trim()) patch.label = b.label.trim().slice(0, 80);
     if (typeof b.url === 'string') {
       try {
@@ -812,6 +825,8 @@ export function startWeb(client: Client): void {
       patch.description = (b.description ?? '').slice(0, 200) || null;
     if (typeof b.emoji === 'string' || b.emoji === null)
       patch.emoji = (b.emoji ?? '').slice(0, 64) || null;
+    if (typeof b.suffix === 'string' || b.suffix === null)
+      patch.suffix = cleanSuffix(b.suffix);
     const r = await updateLink(gid, id, patch);
     if (r === 'missing') return res.status(404).json({ error: 'not_found' });
     if (r === 'duplicate') return res.status(409).json({ error: 'duplicate_label' });
@@ -864,6 +879,7 @@ export function startWeb(client: Client): void {
         url,
         typeof t.description === 'string' ? t.description.slice(0, 200) : null,
         typeof t.emoji === 'string' ? t.emoji.slice(0, 64) : (typeof emoji === 'string' ? emoji.slice(0, 64) : null),
+        cleanSuffix(t.suffix) ?? autoSuffix(lbl),
       );
       ok ? added++ : skipped++;
       names.add(lbl.toLowerCase());

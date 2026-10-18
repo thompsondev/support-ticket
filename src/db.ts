@@ -164,6 +164,7 @@ CREATE TABLE IF NOT EXISTS links (
   url TEXT NOT NULL,
   description TEXT,
   emoji TEXT,
+  suffix TEXT,
   UNIQUE(guild_id, label)
 );
 CREATE TABLE IF NOT EXISTS blacklist (
@@ -452,6 +453,7 @@ CREATE TABLE IF NOT EXISTS links (
   url TEXT NOT NULL,
   description TEXT,
   emoji TEXT,
+  suffix TEXT,
   UNIQUE(guild_id, label)
 );
 CREATE TABLE IF NOT EXISTS blacklist (
@@ -746,6 +748,9 @@ async function initSchema(): Promise<void> {
     if (!linkCols.includes('emoji')) {
       sqlite.exec('ALTER TABLE links ADD COLUMN emoji TEXT');
     }
+    if (!linkCols.includes('suffix')) {
+      sqlite.exec('ALTER TABLE links ADD COLUMN suffix TEXT');
+    }
     return;
   }
   const p = pg!;
@@ -767,6 +772,7 @@ async function initSchema(): Promise<void> {
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS instant INTEGER NOT NULL DEFAULT 1');
   await p.query('ALTER TABLE ticket_types ADD COLUMN IF NOT EXISTS button_style TEXT');
   await p.query('ALTER TABLE links ADD COLUMN IF NOT EXISTS emoji TEXT');
+  await p.query('ALTER TABLE links ADD COLUMN IF NOT EXISTS suffix TEXT');
 }
 
 let initPromise: Promise<void> | null = null;
@@ -887,6 +893,7 @@ export interface LinkRow {
   url: string;
   description: string | null;
   emoji: string | null;
+  suffix: string | null;
 }
 
 // ---------- guild config ----------
@@ -1020,8 +1027,8 @@ export async function getLinkById(guildId: string, id: number): Promise<LinkRow 
     | undefined;
 }
 
-export async function addLink(guildId: string, label: string, url: string, description: string | null, emoji?: string | null): Promise<boolean> {
-  const res = await D.run('INSERT OR IGNORE INTO links (guild_id, label, url, description, emoji) VALUES (?, ?, ?, ?, ?)', [guildId, label, url, description, emoji ?? null]);
+export async function addLink(guildId: string, label: string, url: string, description: string | null, emoji?: string | null, suffix?: string | null): Promise<boolean> {
+  const res = await D.run('INSERT OR IGNORE INTO links (guild_id, label, url, description, emoji, suffix) VALUES (?, ?, ?, ?, ?, ?)', [guildId, label, url, description, emoji ?? null, suffix ?? null]);
   return Number(res.changes) > 0;
 }
 
@@ -1033,7 +1040,7 @@ export async function removeLink(guildId: string, label: string): Promise<boolea
 export async function updateLink(
   guildId: string,
   id: number,
-  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji'>>,
+  patch: Partial<Pick<LinkRow, 'label' | 'url' | 'description' | 'emoji' | 'suffix'>>,
 ): Promise<'ok' | 'missing' | 'duplicate'> {
   const keys = Object.keys(patch) as (keyof typeof patch)[];
   if (!keys.length) return 'ok';

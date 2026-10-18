@@ -31,7 +31,8 @@ export const link: Command = {
         .addStringOption((o) => o.setName('label').setDescription('Link name').setRequired(true))
         .addStringOption((o) => o.setName('url').setDescription('https://…').setRequired(true))
         .addStringOption((o) => o.setName('description').setDescription('Short description'))
-        .addStringOption((o) => o.setName('emoji').setDescription('Button emoji (unicode or <:name:id>)')),
+        .addStringOption((o) => o.setName('emoji').setDescription('Button emoji (unicode or <:name:id>)'))
+        .addStringOption((o) => o.setName('suffix').setDescription('Appended to the URL, e.g. ?migration')),
     )
     .addSubcommand((s) =>
       s.setName('remove').setDescription('Remove a link (staff)')
@@ -60,7 +61,9 @@ export const link: Command = {
         await i.reply(ephemeral('Invalid URL — must start with http:// or https://'));
         return;
       }
-      const added = await addLink(i.guildId, label, url, i.options.getString('description'), i.options.getString('emoji'));
+      const sfxRaw = i.options.getString('suffix')?.trim();
+      const suffix = sfxRaw ? (/^[?/&#]/.test(sfxRaw) ? sfxRaw.slice(0, 64) : `?${sfxRaw.slice(0, 63)}`) : null;
+      const added = await addLink(i.guildId, label, url, i.options.getString('description'), i.options.getString('emoji'), suffix);
       await i.reply(
         ephemeral(added ? `✅ Added **${label}**.` : `A link named **${label}** already exists.`),
       );
