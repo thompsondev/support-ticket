@@ -416,9 +416,9 @@ function types() {
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Ticket types</h3>
-      <p class="muted">Shown in the panel picker and on tickets. Max 25. A type's <b>category</b> overrides the default open-ticket category — tickets of that type always open there.</p>
+      <p class="muted">Shown in the panel picker and on tickets. Max 25. A type's <b>category</b> overrides the default open-ticket category — tickets of that type always open there. <b>Instant</b> opens the ticket immediately on click; <b>Ask first</b> shows the intake form/modal.</p>
       <table>
-        <tr><th></th><th>ID</th><th>Label</th><th>Emoji</th><th>Description</th><th>Category</th><th></th></tr>
+        <tr><th></th><th>ID</th><th>Label</th><th>Emoji</th><th>Description</th><th>Category</th><th>Opens</th><th></th></tr>
         ${ts
           .map(
             (t) => `<tr data-id="${esc(t.type_id)}">
@@ -427,6 +427,7 @@ function types() {
             <td><input class="t-emoji" value="${esc(t.emoji ?? '')}" style="width:70px"></td>
             <td><input class="t-desc" value="${esc(t.description ?? '')}"></td>
             <td><select class="t-cat">${catOpts(t.category_id)}</select></td>
+            <td><select class="t-instant"><option value="1" ${t.instant ? 'selected' : ''}>⚡ Instant</option><option value="0" ${t.instant ? '' : 'selected'}>📝 Ask first</option></select></td>
             <td><button class="btn small secondary t-save">Save</button>
                 <button class="btn small danger t-del">✕</button></td>
           </tr>`,
@@ -439,6 +440,7 @@ function types() {
         <div><label>Emoji</label><input id="n-emoji" placeholder="💎"></div>
         <div><label>Description</label><input id="n-desc" placeholder="Priority help"></div>
         <div><label>Category</label><select id="n-cat">${catOpts(null)}</select></div>
+        <div><label>Opens</label><select id="n-instant"><option value="1">⚡ Instant</option><option value="0">📝 Ask first</option></select></div>
         <button class="btn" id="n-add">Add</button>
       </div>
     </div>`;
@@ -453,6 +455,7 @@ function types() {
           emoji: tr.querySelector('.t-emoji').value || null,
           description: tr.querySelector('.t-desc').value || null,
           category_id: tr.querySelector('.t-cat').value || null,
+          instant: tr.querySelector('.t-instant').value === '1',
         }),
       });
       await reloadOverview('types');
@@ -479,6 +482,7 @@ function types() {
           emoji: document.getElementById('n-emoji').value.trim() || null,
           description: document.getElementById('n-desc').value.trim() || null,
           category_id: document.getElementById('n-cat').value || null,
+          instant: document.getElementById('n-instant').value === '1',
         }),
       });
       await reloadOverview('types');

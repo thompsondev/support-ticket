@@ -1,9 +1,11 @@
 import {
   ActionRowBuilder,
+  ButtonInteraction,
   GuildMember,
   Interaction,
   MessageFlags,
   ModalBuilder,
+  StringSelectMenuInteraction,
   TextInputBuilder,
   TextInputStyle,
 } from 'discord.js';
@@ -68,10 +70,28 @@ async function ticketModal(guildId: string, typeId: string): Promise<ModalBuilde
 
 export async function onInteraction(i: Interaction): Promise<void> {
   try {
+    // instant-open types skip the modal entirely — click → ticket created
+    const openOrModal = async (
+      i2: ButtonInteraction | StringSelectMenuInteraction,
+      typeId: string,
+    ): Promise<void> => {
+      if (!i2.guildId || !i2.isRepliable()) return;
+      const t = await getTicketType(i2.guildId, typeId);
+      if (t?.instant) {
+        const guild = i2.guild ?? (await i2.client.guilds.fetch(i2.guildId).catch(() => null));
+        if (!guild) return;
+        const res = await createTicket(guild, i2.user, typeId, `${t.label} request`, null);
+        await i2.reply(
+          ephemeral(res.ok ? `✅ Ticket created: ${res.channel}` : `❌ ${res.reason}`),
+        ).catch(() => {});
+        return;
+      }
+      await i2.showModal(await ticketModal(i2.guildId, typeId));
+    };
+
     // ---- select menus ----
     if (i.isStringSelectMenu() && i.customId === 'panel:select') {
-      if (!i.guildId) return;
-      await i.showModal(await ticketModal(i.guildId, i.values[0]));
+      await openOrModal(i, i.values[0]);
       return;
     }
 
@@ -80,8 +100,7 @@ export async function onInteraction(i: Interaction): Promise<void> {
       const id = i.customId;
 
       if (id.startsWith('ticket:create:')) {
-        if (!i.guildId) return;
-        await i.showModal(await ticketModal(i.guildId, id.slice('ticket:create:'.length)));
+        await openOrModal(i, id.slice('ticket:create:'.length));
         return;
       }
 
