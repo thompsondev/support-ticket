@@ -438,6 +438,33 @@ export function startWeb(client: Client): void {
     res.json({ ok: true, hub_guild_id: gid, hub_invite: invite });
   });
 
+  // post the caller's hub invite into a channel of a bot-installed guild they manage
+  app.post('/api/guilds/:gid/post-invite', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const p = await getUserProfile(req.session.user!.id);
+    const invite = p?.hub_invite || env.hubInvite;
+    if (!invite) {
+      return res.status(400).json({ error: 'no_hub', hint: 'Set your support hub first (Discover → My support hub).' });
+    }
+    const channelId = req.body?.channel_id;
+    const ch = await client.guilds.cache
+      .get(gid)
+      ?.channels.fetch(String(channelId ?? ''))
+      .catch(() => null);
+    if (!ch?.isSendable() || ch.isDMBased()) {
+      return res.status(400).json({ error: 'invalid_channel' });
+    }
+    await ch.send({
+      embeds: [
+        new EmbedBuilder()
+          .setTitle('🎫 Need help? Join our support hub')
+          .setColor(0x5865f2)
+          .setDescription(`Open a ticket and our team will help you:\n👉 ${invite}`),
+      ],
+    });
+    res.json({ ok: true });
+  });
+
   // switch the session's active Discord identity to a previously-authorized account
   app.post('/api/accounts/switch', authed, async (req, res) => {
     const { accountId } = req.body ?? {};

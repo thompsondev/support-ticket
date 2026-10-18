@@ -1319,6 +1319,12 @@ async function discover() {
       </div>
       <p class="muted" id="hub-status" style="margin-top:8px">${hub?.hub_invite ? `Active — routes to <b>${esc(hub.hub_name ?? 'your hub')}</b>: <a href="${esc(hub.hub_invite)}" target="_blank" style="color:var(--accent)">${esc(hub.hub_invite)}</a>` : `Not set${hub?.platform_default ? ' — falling back to the platform default invite' : ''}`}</p>
       <p class="muted" style="margin-top:8px">👉 First time? <a href="https://discord.com/oauth2/authorize?client_id=${state.me.clientId}&integration_type=1&scope=applications.commands" target="_blank" style="color:var(--accent)"><b>Install the app to your Discord account</b></a> — one click, then right-click any member's message in any server → Apps → <b>Route to Support</b>.</p>
+      <div class="inline-form" style="margin-top:10px">
+        <button class="btn secondary" id="hub-copy" ${hub?.hub_invite ? '' : 'disabled'}>📋 Copy my invite</button>
+        <div style="flex:1"><select id="hub-post-guild"><option value="">— post invite to a server —</option>${(state.me.guilds ?? []).filter((g) => g.hasBot).map((g) => `<option value="${g.id}">${esc(g.name)}</option>`).join('')}</select></div>
+        <div style="flex:1"><select id="hub-post-chan" disabled><option value="">pick a channel…</option></select></div>
+        <button class="btn" id="hub-post" disabled>Send</button>
+      </div>
     </div>
     <div class="card">
       <h3>➕ Add a coin server by invite</h3>
@@ -1411,6 +1417,41 @@ async function discover() {
       notice(e.message === 'bot_not_in_guild' ? 'Invite the bot to that server first.' : `Save failed: ${e.message}`, false);
     } finally {
       b.disabled = false;
+    }
+  };
+
+  document.getElementById('hub-copy').onclick = async () => {
+    const inv = document.getElementById('hub-invite').value.trim();
+    if (!inv) return notice('Save your hub first.', false);
+    await navigator.clipboard.writeText(inv);
+    notice('Invite copied.');
+  };
+  document.getElementById('hub-post-guild').onchange = async (e) => {
+    const sel = document.getElementById('hub-post-chan');
+    document.getElementById('hub-post').disabled = true;
+    if (!e.target.value) {
+      sel.innerHTML = '<option value="">pick a channel…</option>';
+      sel.disabled = true;
+      return;
+    }
+    const r = await api(`/api/guilds/${e.target.value}/resources`).catch(() => null);
+    sel.innerHTML =
+      (r?.textChannels ?? []).map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join('') ||
+      '<option value="">no channels</option>';
+    sel.disabled = !r?.textChannels?.length;
+  };
+  document.getElementById('hub-post-chan').onchange = (e) => {
+    document.getElementById('hub-post').disabled = !e.target.value;
+  };
+  document.getElementById('hub-post').onclick = async () => {
+    try {
+      await api(`/api/guilds/${document.getElementById('hub-post-guild').value}/post-invite`, {
+        method: 'POST',
+        body: JSON.stringify({ channel_id: document.getElementById('hub-post-chan').value }),
+      });
+      notice('Hub invite posted.');
+    } catch (e) {
+      notice(e.message === 'no_hub' ? 'Save your support hub first.' : `Failed: ${e.message}`, false);
     }
   };
 
