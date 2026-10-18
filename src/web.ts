@@ -1,7 +1,7 @@
 import express, { NextFunction, Request, Response } from 'express';
 import session from 'express-session';
 import { randomBytes } from 'node:crypto';
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ChannelType, Client, EmbedBuilder, PermissionFlagsBits } from 'discord.js';
@@ -218,9 +218,27 @@ export function startWeb(client: Client): void {
     }
     next();
   });
-  app.use(express.static(PUBLIC_DIR, { index: false }));
-  app.get('/', async (_req: Request, res) => res.sendFile('landing.html', { root: PUBLIC_DIR }));
-  app.get('/dashboard', async (_req: Request, res) => res.sendFile('index.html', { root: PUBLIC_DIR }));
+  // cache strategy: HTML is never cached (always fresh on load); static assets
+  // are versioned per boot (?v=) so a redeploy busts them automatically
+  const BOOT = Date.now().toString(36);
+  const noCache = { 'Cache-Control': 'no-cache, no-store, must-revalidate' };
+  app.use(
+    express.static(PUBLIC_DIR, {
+      index: false,
+      setHeaders: (res, path) => {
+        res.setHeader('Cache-Control', path.endsWith('.html') ? 'no-cache' : 'public, max-age=86400');
+      },
+    }),
+  );
+  app.get('/', async (_req: Request, res) =>
+    res.sendFile('landing.html', { root: PUBLIC_DIR, headers: noCache }),
+  );
+  app.get('/dashboard', async (_req: Request, res) => {
+    const html = readFileSync(join(PUBLIC_DIR, 'index.html'), 'utf8')
+      .replace('href="style.css"', `href="style.css?v=${BOOT}"`)
+      .replace('src="app.js"', `src="app.js?v=${BOOT}"`);
+    res.set(noCache).type('html').send(html);
+  });
 
   // public info for the landing page (no auth)
   app.get('/api/public', async (_req: Request, res) =>
