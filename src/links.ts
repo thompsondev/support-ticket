@@ -1,9 +1,8 @@
 import {
   ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   EmbedBuilder,
   MessageCreateOptions,
+  StringSelectMenuBuilder,
 } from 'discord.js';
 import { createHmac } from 'node:crypto';
 import { getLinks } from './db';
@@ -19,36 +18,43 @@ export function linkSig(guildId: string, linkId: number, userId: string): string
     .slice(0, 16);
 }
 
-// Professional links panel: descriptions live in the embed, each link is a
-// Link-style button — users click the label, the URL is never shown in chat.
-export async function linksMessage(guildId: string, guildName: string): Promise<MessageCreateOptions> {
+// Issue picker panel — a dropdown of the guild's links. No raw URLs and no
+// button grid: picking an entry triggers an ephemeral self-service card
+// (handled in interactions.ts) whose Resolve button is a tracked redirect.
+export async function linksMessage(guildId: string, _guildName: string): Promise<MessageCreateOptions> {
   const links = await getLinks(guildId);
   const embed = new EmbedBuilder()
-    .setTitle(`🔗 ${guildName} — Useful links`)
+    .setTitle('� Select Category of your Issues')
     .setColor(COLORS.info)
     .setDescription(
       links.length
-        ? links
-            .map((l) => `${l.emoji ? `${l.emoji} ` : ''}**${l.label}**${l.description ? `\n${l.description}` : ''}`)
-            .join('\n\n')
-        : 'No links configured yet. Staff can add them with `/link add` or the dashboard.',
+        ? "Choose the issue that best matches yours below — you'll get a **self-service** resolution link instantly, no need to wait for staff."
+        : 'No links configured yet. Staff can add them with `/link add` or the dashboard Links tab.',
     );
-  const components: ActionRowBuilder<ButtonBuilder>[] = [];
-  for (let r = 0; r < Math.min(links.length, 25); r += 5) {
-    const row = new ActionRowBuilder<ButtonBuilder>();
-    for (const l of links.slice(r, r + 5)) {
-      const b = new ButtonBuilder()
-        .setStyle(ButtonStyle.Link)
-        .setURL(l.url)
-        .setLabel(l.label.slice(0, 80));
-      if (l.emoji) {
-        try {
-          b.setEmoji(l.emoji);
-        } catch { /* invalid emoji string — skip it */ }
-      }
-      row.addComponents(b);
+  if (!links.length) return { embeds: [embed] };
+
+  const menu = new StringSelectMenuBuilder()
+    .setCustomId('issues:pick')
+    .setPlaceholder('Select the category of your issue…');
+  for (const l of links.slice(0, 25)) {
+    const opt: {
+      label: string;
+      value: string;
+      description?: string;
+      emoji?: string | { name: string; id: string };
+    } = {
+      label: l.label.slice(0, 100),
+      value: String(l.id),
+      description: (l.description ?? '').slice(0, 100) || undefined,
+    };
+    if (l.emoji) {
+      const custom = /^<a?:(\w+):(\d+)>$/.exec(l.emoji);
+      opt.emoji = custom ? { name: custom[1], id: custom[2] } : l.emoji;
     }
-    components.push(row);
+    menu.addOptions(opt);
   }
-  return { embeds: [embed], components };
+  return {
+    embeds: [embed],
+    components: [new ActionRowBuilder<StringSelectMenuBuilder>().addComponents(menu)],
+  };
 }

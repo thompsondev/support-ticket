@@ -606,7 +606,7 @@ function links() {
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Links</h3>
-      <p class="muted">Posted by <code>/link show</code> or via <b>Post to channel</b> — each entry renders as a labeled button; users never see the raw URL.</p>
+      <p class="muted">Posted by <code>/issues</code> or via <b>Post to channel</b> — renders as a <b>"Select Category of your Issues"</b> dropdown. Picking an entry shows the user a self-service Resolve button (URL hidden); every click is logged to your log channel.</p>
       <table>
         <tr><th>Label</th><th>Emoji</th><th>URL</th><th>Description</th><th></th></tr>
         ${ls
@@ -639,7 +639,7 @@ function links() {
       <h3 style="margin-top:16px">Post to channel</h3>
       <div class="inline-form">
         <div style="flex:2"><select id="nl-channel"><option value="">— pick a channel —</option>${(state.resources?.textChannels ?? []).map((c) => `<option value="${c.id}">#${esc(c.name)}</option>`).join('')}</select></div>
-        <button class="btn secondary" id="nl-post" ${ls.length ? '' : 'disabled'}>Post links panel</button>
+        <button class="btn secondary" id="nl-post" ${ls.length ? '' : 'disabled'}>Post issue picker</button>
       </div>
     </div>`;
 
