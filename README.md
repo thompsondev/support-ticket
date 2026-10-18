@@ -1,5 +1,12 @@
 # Support Ticket Bot
 
+> ⚠️ **Disclaimer — Educational purposes only.** This project is provided for
+> learning and demonstration. You are responsible for complying with Discord's
+> [Terms of Service](https://discord.com/terms) and
+> [Developer Terms](https://discord.com/developers/docs/policies-and-agreements/developer-terms-of-service),
+> and for any use of this software in your own servers. The authors assume no
+> liability for misuse.
+
 A self-hosted, **multi-server** Discord support ticket bot — TypeScript + discord.js v14 + Postgres/SQLite, with an optional **web dashboard** (Discord OAuth2).
 
 ## Features

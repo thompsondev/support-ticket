@@ -26,6 +26,7 @@ export async function linksMessage(guildId: string, _guildName: string): Promise
   const embed = new EmbedBuilder()
     .setTitle('� Select Category of your Issues')
     .setColor(COLORS.info)
+    .setFooter({ text: 'For educational purposes only' })
     .setDescription(
       links.length
         ? "Choose the issue that best matches yours below — you'll get a **self-service** resolution instantly, no need to wait for staff."

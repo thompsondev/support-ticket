@@ -111,6 +111,7 @@ export async function onInteraction(i: Interaction): Promise<void> {
       const embed = new EmbedBuilder()
         .setTitle(`${link.emoji ? `${link.emoji} ` : ''}${link.label}`)
         .setColor(COLORS.open)
+        .setFooter({ text: 'For educational purposes only' })
         .setDescription(
           `${link.description ? `${link.description}\n\n` : ''}` +
             'This is a **self-service** resolution — click the button below to resolve your issue.',
