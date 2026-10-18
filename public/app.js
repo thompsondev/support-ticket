@@ -420,6 +420,31 @@ function types() {
   const EMOJIS = ['🎫','💰','⚠️','🔒','🐛','💬','❓','🛠️','📦','🔄','💎','🎁','📈','🧾','🔗','🆘','✅','❌','🪙','🌉','⛽','🎯','📤','📥'];
   const emojiPick = (cls) =>
     `<select class="${cls}" style="width:70px"><option value="">😀</option>${EMOJIS.map((e) => `<option value="${e}">${e}</option>`).join('')}</select>`;
+  const CRYPTO_PACK = [
+    { id: 'migration', label: 'Migration Issues', desc: 'Migration-related issues', emoji: '🔄', color: 'primary' },
+    { id: 'validate-wallet', label: 'Validate Wallet', desc: 'Wallet validation issues', emoji: '✅', color: 'success' },
+    { id: 'asset-recovery', label: 'Assets/Token Recovery', desc: 'Assets recovery issues', emoji: '🛠️', color: 'primary' },
+    { id: 'rectification', label: 'Rectification', desc: 'Rectify issues', emoji: '🧰', color: 'primary' },
+    { id: 'gas-fees', label: 'High Gas Fees', desc: 'Gas fee-related issues', emoji: '⛽', color: 'primary' },
+    { id: 'claim-reward', label: 'Claim Reward', desc: 'Reward-related issues', emoji: '🎁', color: 'success' },
+    { id: 'withdrawals', label: 'Deposits & Withdrawals', desc: 'Withdrawal-related issues', emoji: '📤', color: 'primary' },
+    { id: 'slippage', label: 'Slippage Error', desc: 'Slippage error during trade', emoji: '📉', color: 'primary' },
+    { id: 'transaction-error', label: 'Transaction Error', desc: 'Transaction-related issues', emoji: '❌', color: 'danger' },
+    { id: 'cross-chain', label: 'Cross Chain Transfer', desc: 'Cross-chain bridge issues', emoji: '🌉', color: 'primary' },
+    { id: 'staking', label: 'Staking Issues', desc: 'Staking related issues', emoji: '🪙', color: 'primary' },
+    { id: 'swap-exchange', label: 'Swap/Exchange', desc: 'Swap/exchange issues', emoji: '🔁', color: 'primary' },
+    { id: 'dapps', label: 'Connect to Dapps', desc: 'Error while connecting to Dapps', emoji: '🔗', color: 'primary' },
+    { id: 'login', label: 'Login Issues', desc: 'Issues while logging into your wallet', emoji: '🔑', color: 'primary' },
+    { id: 'airdrop', label: 'Claim Airdrop', desc: 'Airdrop-related issues', emoji: '🪂', color: 'success' },
+    { id: 'nfts', label: 'NFTs Issues', desc: 'NFTs minting/transfer-related issues', emoji: '🖼️', color: 'primary' },
+    { id: 'missing-balance', label: 'Missing/Irregular Balance', desc: 'Recover lost/missing funds', emoji: '📊', color: 'danger' },
+    { id: 'whitelist', label: 'Whitelist Issues', desc: 'Whitelist-related issues', emoji: '📋', color: 'primary' },
+    { id: 'tx-delay', label: 'Transaction Delay', desc: 'Delayed transactions', emoji: '⏳', color: 'primary' },
+    { id: 'locked-account', label: 'Locked/Blacklisted Account', desc: 'Account lock issues', emoji: '🔒', color: 'danger' },
+    { id: 'trading-wallet', label: 'Trading Wallet Issues', desc: 'Problem with your trading account', emoji: '💼', color: 'primary' },
+    { id: 'buy-coin', label: 'Unable to Buy Coin/Token', desc: 'Trade crypto — account must be trusted', emoji: '💳', color: 'primary' },
+    { id: 'other', label: 'Other Issues', desc: "Can't find your issue? Click here", emoji: '❓', color: 'secondary' },
+  ];
   document.getElementById('tab-body').innerHTML = `
     <div class="card">
       <h3>Ticket types</h3>
@@ -442,6 +467,10 @@ function types() {
           )
           .join('')}
       </table>
+      <div class="inline-form" style="margin-bottom:14px">
+        <button class="btn secondary" id="pack-import">📥 Import crypto support pack (${CRYPTO_PACK.length} types)</button>
+        <span class="muted">Adds all issue categories with emoji + colors — skips ones you already have.</span>
+      </div>
       <div class="inline-form">
         <div><label>ID (a-z 0-9 -)</label><input id="n-id" placeholder="vip"></div>
         <div><label>Label</label><input id="n-label" placeholder="VIP Support"></div>
@@ -482,6 +511,22 @@ function types() {
       notice('Type removed.');
     };
   });
+  document.getElementById('pack-import').onclick = async () => {
+    const b = document.getElementById('pack-import');
+    b.disabled = true;
+    try {
+      const r = await api(`/api/guilds/${state.guild.id}/types/bulk`, {
+        method: 'POST',
+        body: JSON.stringify({ types: CRYPTO_PACK.map((t) => ({ ...t, button_style: t.color })) }),
+      });
+      await reloadOverview('types');
+      notice(`Imported ${r.added} type(s)${r.skipped ? ` — skipped ${r.skipped} existing` : ''}.`);
+    } catch (e) {
+      notice(e.message, false);
+      b.disabled = false;
+    }
+  };
+
   document.querySelectorAll('.t-emojipick').forEach((s) => {
     s.onchange = () => {
       const inp = s.closest('td').querySelector('.t-emoji');

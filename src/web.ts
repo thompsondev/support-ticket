@@ -671,6 +671,42 @@ export function startWeb(client: Client): void {
     res.status(ok ? 200 : 409).json({ ok, error: ok ? undefined : 'exists' });
   });
 
+  // bulk import — e.g. preset packs. Skips duplicates/invalid; stops at the 25 cap.
+  app.post('/api/guilds/:gid/types/bulk', authed, guildAccess, async (req, res) => {
+    const gid = req.params.gid as string;
+    const items = Array.isArray(req.body?.types) ? req.body.types : [];
+    const existing = await getTicketTypes(gid);
+    const ids = new Set(existing.map((t) => t.type_id));
+    let added = 0;
+    let skipped = 0;
+    for (const t of items.slice(0, 30)) {
+      if (
+        !TYPE_ID_RE.test(String(t.id)) ||
+        typeof t.label !== 'string' ||
+        !t.label.trim() ||
+        ids.has(t.id) ||
+        existing.length + added >= 25
+      ) {
+        skipped++;
+        continue;
+      }
+      const ok = await addTicketType(gid, {
+        type_id: String(t.id),
+        label: String(t.label).slice(0, 100),
+        emoji: typeof t.emoji === 'string' ? t.emoji.slice(0, 64) : null,
+        description: typeof t.description === 'string' ? t.description.slice(0, 100) : null,
+        instant: 1,
+        button_style: ['primary', 'secondary', 'success', 'danger'].includes(t.button_style)
+          ? t.button_style
+          : null,
+      });
+      ok ? added++ : skipped++;
+      ids.add(String(t.id));
+    }
+    if (added) await logAudit(req.session.user!.id, 'types_bulk_add', gid, `${added} types`);
+    res.json({ ok: true, added, skipped });
+  });
+
   app.patch('/api/guilds/:gid/types/:typeId', authed, guildAccess, async (req, res) => {
     const { label, emoji, description, category_id, instant, button_style } = req.body ?? {};
     const patch: Record<string, string | number | null> = {};
